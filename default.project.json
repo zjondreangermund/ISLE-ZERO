@@ -1,0 +1,23 @@
+{
+  "name": "ISLE ZERO",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "ISLEZero": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "ISLEZero": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}
