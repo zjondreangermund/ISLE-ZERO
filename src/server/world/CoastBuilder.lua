@@ -7,6 +7,7 @@ local function makePart(parent, name, size, cframe, material, color)
     p.Name = name
     p.Anchored = true
     p.CanCollide = true
+    p.CanTouch = false
     p.Material = material
     p.Color = color
     p.Size = size
@@ -59,6 +60,7 @@ function CoastBuilder.Build(config, root, heightAt)
                 Color3.fromRGB(91, 73, 54)
             )
             log.CanCollide = false
+            log.CanQuery = false
         end
     end
 
