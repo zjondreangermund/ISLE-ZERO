@@ -26,6 +26,9 @@ jobs:
       - name: Install toolchain
         run: rokit install
 
+      - name: Lint Luau
+        run: selene src
+
       - name: Build Roblox place
         run: rojo build default.project.json --output ISLE-ZERO.rbxlx
 
