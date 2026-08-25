@@ -4,6 +4,7 @@ local config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Wo
 local AtmosphereBuilder = require(script.Parent.AtmosphereBuilder)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local CoastBuilder = require(script.Parent.CoastBuilder)
+local NaturalFeatureBuilder = require(script.Parent.NaturalFeatureBuilder)
 local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
@@ -49,6 +50,7 @@ function WorldBuilder.Build()
     AtmosphereBuilder.Build(config)
     local terrainState = TerrainBuilder.Build(config)
     CoastBuilder.Build(config, root, TerrainBuilder.HeightAt)
+    NaturalFeatureBuilder.Build(config, root, TerrainBuilder.HeightAt)
 
     -- Paths are laid before vegetation so tree placement can reserve walkable
     -- corridors and we do not end up with trunks in the middle of the trail.
