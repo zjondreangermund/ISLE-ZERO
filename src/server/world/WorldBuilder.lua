@@ -49,6 +49,7 @@ end
 local function runPhase(root, phaseName, callback)
     root:SetAttribute("CurrentPhase", phaseName)
     root:SetAttribute("BuildState", "Building")
+    workspace:SetAttribute("ISLEZeroCurrentPhase", phaseName)
 
     local started = os.clock()
     local ok, result = pcall(callback)
@@ -86,6 +87,8 @@ function WorldBuilder.Build()
 
     local started = os.clock()
     local root = nil
+
+    workspace:SetAttribute("ISLEZeroCurrentPhase", "Starting")
 
     local ok, result = pcall(function()
         removeTemplateObjects()
@@ -158,6 +161,7 @@ function WorldBuilder.Build()
         workspace:SetAttribute("ISLEZeroWorldSeed", config.Seed)
         workspace:SetAttribute("ISLEZeroGenerated", true)
         workspace:SetAttribute("ISLEZeroBuildState", "Ready")
+        workspace:SetAttribute("ISLEZeroCurrentPhase", "Ready")
         workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
         workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors)
         workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings)
