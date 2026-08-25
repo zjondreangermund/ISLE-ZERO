@@ -43,8 +43,8 @@ local WorldConfig = {
             Radius = 72,
         },
         MangroveLagoon = {
-            Position = Vector3.new(-790, 0, 205),
-            Radius = 66,
+            Position = Vector3.new(-875, 0, 250),
+            Radius = 62,
         },
         WindArch = {
             Position = Vector3.new(900, 0, -575),
