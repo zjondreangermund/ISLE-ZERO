@@ -9,6 +9,7 @@ local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
 local WorldAudit = require(script.Parent.WorldAudit)
+local WorldPreflight = require(script.Parent.WorldPreflight)
 local SpawnFlow = require(script.Parent.SpawnFlow)
 
 local WorldBuilder = {}
@@ -73,6 +74,10 @@ local function markBuildFailed(root, message)
 end
 
 function WorldBuilder.Build()
+    -- Validate all authoring configuration before clearing terrain, deleting the
+    -- Baseplate or moving players to the temporary generation platform.
+    WorldPreflight.Assert(config)
+
     local started = os.clock()
     removeTemplateObjects()
     SpawnFlow.Prepare(config)
