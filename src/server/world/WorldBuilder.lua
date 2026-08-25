@@ -7,6 +7,7 @@ local CoastBuilder = require(script.Parent.CoastBuilder)
 local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
+local WorldAudit = require(script.Parent.WorldAudit)
 
 local WorldBuilder = {}
 
@@ -46,10 +47,14 @@ function WorldBuilder.Build()
         PathBuilder.DistanceToAnyPath
     )
 
+    local audit = WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
+
     workspace:SetAttribute("ISLEZeroWorldVersion", config.WorldVersion)
     workspace:SetAttribute("ISLEZeroWorldSeed", config.Seed)
     workspace:SetAttribute("ISLEZeroGenerated", true)
     workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
+    workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors)
+    workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings)
 
     return root
 end
