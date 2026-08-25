@@ -60,6 +60,9 @@ function WorldPreflight.Run(config)
         elseif isFiniteNumber(config.SeaLevel) and island.BaseY >= config.SeaLevel then
             add(report, "errors", "Island.BaseY must be below SeaLevel")
         end
+        if not isFiniteNumber(island.BeachBand) or island.BeachBand <= 0 or island.BeachBand >= 0.8 then
+            add(report, "errors", "Island.BeachBand must be greater than 0 and below 0.8")
+        end
 
         if isFiniteNumber(config.WorldHalfSize) and isFiniteNumber(island.HalfX) and island.HalfX >= config.WorldHalfSize then
             add(report, "errors", "Island.HalfX must fit inside WorldHalfSize")
@@ -80,6 +83,25 @@ function WorldPreflight.Run(config)
             add(report, "errors", "Generation.VegetationDensity must be zero or greater")
         elseif generation.VegetationDensity > 2 then
             add(report, "warnings", "VegetationDensity above 2 may create excessive placeholder instances")
+        end
+    end
+
+    local audit = config.Audit
+    if audit ~= nil then
+        if type(audit) ~= "table" then
+            add(report, "errors", "Audit settings must be a table")
+        else
+            if not isFiniteNumber(audit.WarnPathGrade) or audit.WarnPathGrade <= 0 then
+                add(report, "errors", "Audit.WarnPathGrade must be greater than zero")
+            end
+            if not isFiniteNumber(audit.WarnGeneratedDescendants) or audit.WarnGeneratedDescendants < 1 then
+                add(report, "errors", "Audit.WarnGeneratedDescendants must be at least 1")
+            end
+            if not isFiniteNumber(audit.MaxGeneratedDescendants) or audit.MaxGeneratedDescendants < 1 then
+                add(report, "errors", "Audit.MaxGeneratedDescendants must be at least 1")
+            elseif isFiniteNumber(audit.WarnGeneratedDescendants) and audit.MaxGeneratedDescendants <= audit.WarnGeneratedDescendants then
+                add(report, "errors", "Audit.MaxGeneratedDescendants must be above WarnGeneratedDescendants")
+            end
         end
     end
 
