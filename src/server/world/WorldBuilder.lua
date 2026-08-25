@@ -8,6 +8,7 @@ local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
 local WorldAudit = require(script.Parent.WorldAudit)
+local SpawnFlow = require(script.Parent.SpawnFlow)
 
 local WorldBuilder = {}
 
@@ -42,6 +43,7 @@ end
 function WorldBuilder.Build()
     local started = os.clock()
     removeTemplateObjects()
+    SpawnFlow.Prepare(config)
     local root = createRoot()
 
     AtmosphereBuilder.Build(config)
@@ -60,6 +62,8 @@ function WorldBuilder.Build()
     )
 
     local audit = WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
+    local spawnReleased = SpawnFlow.Release(root)
+    root:SetAttribute("SpawnReleased", spawnReleased)
 
     workspace:SetAttribute("ISLEZeroWorldVersion", config.WorldVersion)
     workspace:SetAttribute("ISLEZeroWorldSeed", config.Seed)
