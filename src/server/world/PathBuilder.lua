@@ -37,6 +37,7 @@ local function createTrailPiece(parent, a, b, width, material, color)
     piece.Name = "Trail"
     piece.Anchored = true
     piece.CanCollide = false
+    piece.CanTouch = false
     piece.CanQuery = false
     piece.CastShadow = false
     piece.Material = material
