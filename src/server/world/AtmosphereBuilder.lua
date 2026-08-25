@@ -59,7 +59,8 @@ function AtmosphereBuilder.Build()
     clouds.Color = Color3.fromRGB(238, 241, 237)
     clouds.Parent = workspace.Terrain
 
-    workspace.FallenPartsDestroyHeight = -500
+    -- FallenPartsDestroyHeight is intentionally left to Studio place settings;
+    -- Roblox restricts changing it from ordinary runtime scripts.
 end
 
 return AtmosphereBuilder
