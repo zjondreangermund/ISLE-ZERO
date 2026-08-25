@@ -77,7 +77,8 @@ local function rebuild(player)
 end
 
 local function onCommand(player, message)
-    local command = string.lower(string.gsub(message, "^%s*(.-)%s*$", "%1"))
+    local trimmed = string.gsub(message, "^%s*(.-)%s*$", "%1")
+    local command = string.lower(trimmed)
 
     if command == "/worldstatus" then
         printStatus(player)
