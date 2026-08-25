@@ -1,5 +1,5 @@
 local WorldConfig = {
-    WorldVersion = 1,
+    WorldVersion = 2,
     Seed = 7102026,
 
     SeaLevel = 0,
@@ -11,13 +11,19 @@ local WorldConfig = {
         HalfZ = 980,
         Grid = 32,
         BaseY = -72,
-        BeachBand = 0.18,
+        BeachBand = 0.28,
     },
 
     Generation = {
         YieldEvery = 180,
         ClearExisting = true,
         VegetationDensity = 1.0,
+    },
+
+    Audit = {
+        WarnPathGrade = 0.65,
+        WarnGeneratedDescendants = 3500,
+        MaxGeneratedDescendants = 5000,
     },
 
     Locations = {
