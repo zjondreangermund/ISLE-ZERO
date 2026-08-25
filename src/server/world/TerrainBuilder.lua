@@ -26,7 +26,7 @@ function TerrainBuilder.HeightAt(config, x, z)
     end
 
     local height
-    local beachBand = 0.28
+    local beachBand = island.BeachBand or 0.28
     if edge < beachBand then
         height = 3 + (edge / beachBand) * 18
     else
@@ -102,9 +102,6 @@ function TerrainBuilder.Build(config)
         terrain:Clear()
     end
 
-    -- Terrain.Decoration is intentionally not assigned here because Roblox
-    -- currently exposes it as a non-scriptable property. Enable terrain
-    -- decoration/grass in Studio place settings for the final art pass.
     terrain.WaterColor = Color3.fromRGB(42, 113, 135)
     terrain.WaterTransparency = 0.3
     terrain.WaterReflectance = 0.08
@@ -121,6 +118,7 @@ function TerrainBuilder.Build(config)
     local island = config.Island
     local grid = island.Grid
     local counter = 0
+    local filledColumns = 0
 
     for x = -island.HalfX - grid, island.HalfX + grid, grid do
         for z = -island.HalfZ - grid, island.HalfZ + grid, grid do
@@ -133,6 +131,7 @@ function TerrainBuilder.Build(config)
                     Vector3.new(grid + 2, columnHeight, grid + 2),
                     material
                 )
+                filledColumns += 1
             end
 
             counter += 1
@@ -176,6 +175,8 @@ function TerrainBuilder.Build(config)
         PoolSurface = poolSurface,
         CaveStart = caveStart,
         CaveEnd = caveEnd,
+        SampledCells = counter,
+        FilledColumns = filledColumns,
     }
 end
 
