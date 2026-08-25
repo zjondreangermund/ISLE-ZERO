@@ -102,7 +102,9 @@ function TerrainBuilder.Build(config)
         terrain:Clear()
     end
 
-    terrain.Decoration = true
+    -- Terrain.Decoration is intentionally not assigned here because Roblox
+    -- currently exposes it as a non-scriptable property. Enable terrain
+    -- decoration/grass in Studio place settings for the final art pass.
     terrain.WaterColor = Color3.fromRGB(42, 113, 135)
     terrain.WaterTransparency = 0.3
     terrain.WaterReflectance = 0.08
