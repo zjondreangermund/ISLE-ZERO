@@ -10,8 +10,16 @@ local REQUIRED_LANDMARKS = {
     "RiverAndWaterfall",
 }
 
+local REQUIRED_NATURAL_FEATURES = {
+    "AncientBanyan",
+    "BlueHoleCenote",
+    "MangroveLagoon",
+    "WindArch",
+}
+
 local REQUIRED_FOLDERS = {
     "CoastAndIslets",
+    "NaturalFeatures",
     "Paths",
     "Landmarks",
     "Vegetation",
@@ -50,6 +58,15 @@ function WorldAudit.Run(config, root, heightAt)
         end
     end
 
+    local natural = root:FindFirstChild("NaturalFeatures")
+    if natural then
+        for _, featureName in ipairs(REQUIRED_NATURAL_FEATURES) do
+            if not natural:FindFirstChild(featureName) then
+                record(report, "errors", "Missing natural feature: " .. featureName)
+            end
+        end
+    end
+
     for pathName, points in pairs(config.Paths) do
         for index, point in ipairs(points) do
             local height = heightAt(config, point.X, point.Z)
@@ -67,6 +84,14 @@ function WorldAudit.Run(config, root, heightAt)
         landmarkPositions[name] = Vector3.new(position.X, height, position.Z)
         if height <= config.SeaLevel then
             record(report, "errors", name .. " is configured outside playable land")
+        end
+    end
+
+    for name, zone in pairs(config.ScenicZones or {}) do
+        local position = zone.Position
+        local height = heightAt(config, position.X, position.Z)
+        if height <= config.SeaLevel then
+            record(report, "errors", "Scenic zone " .. name .. " is configured outside playable land")
         end
     end
 
