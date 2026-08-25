@@ -13,6 +13,17 @@ local WorldBuilder = {}
 
 local WORLD_NAME = "ISLE_ZERO_WORLD"
 
+local function removeTemplateObjects()
+    for _, name in ipairs({"Baseplate", "SpawnLocation"}) do
+        local object = workspace:FindFirstChild(name)
+        if object and object:GetAttribute("PreserveForISLEZero") ~= true then
+            if object:IsA("BasePart") or object:IsA("SpawnLocation") then
+                object:Destroy()
+            end
+        end
+    end
+end
+
 local function createRoot()
     local old = workspace:FindFirstChild(WORLD_NAME)
     if old then
@@ -30,6 +41,7 @@ end
 
 function WorldBuilder.Build()
     local started = os.clock()
+    removeTemplateObjects()
     local root = createRoot()
 
     AtmosphereBuilder.Build(config)
