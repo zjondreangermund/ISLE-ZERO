@@ -33,6 +33,25 @@ local WorldConfig = {
         Mangroves = Vector3.new(-780, 18, 200),
     },
 
+    ScenicZones = {
+        AncientBanyan = {
+            Position = Vector3.new(-40, 0, 330),
+            Radius = 86,
+        },
+        BlueHole = {
+            Position = Vector3.new(80, 0, -300),
+            Radius = 72,
+        },
+        MangroveLagoon = {
+            Position = Vector3.new(-790, 0, 205),
+            Radius = 66,
+        },
+        WindArch = {
+            Position = Vector3.new(900, 0, -575),
+            Radius = 78,
+        },
+    },
+
     Paths = {
         Main = {
             Vector3.new(120, 0, 760),
