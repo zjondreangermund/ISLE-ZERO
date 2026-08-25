@@ -38,7 +38,38 @@ local function createRoot()
     root:SetAttribute("WorldVersion", config.WorldVersion)
     root:SetAttribute("WorldSeed", config.Seed)
     root:SetAttribute("GeneratedAtRuntime", true)
+    root:SetAttribute("BuildComplete", false)
+    root:SetAttribute("BuildState", "Starting")
+    root:SetAttribute("CurrentPhase", "Starting")
     return root
+end
+
+local function runPhase(root, phaseName, callback)
+    root:SetAttribute("CurrentPhase", phaseName)
+    root:SetAttribute("BuildState", "Building")
+
+    local started = os.clock()
+    local ok, result = pcall(callback)
+    local seconds = math.floor((os.clock() - started) * 1000) / 1000
+
+    root:SetAttribute("Phase_" .. phaseName .. "_Seconds", seconds)
+
+    if not ok then
+        error(string.format("World phase '%s' failed: %s", phaseName, tostring(result)), 0)
+    end
+
+    print(string.format("[ISLE//ZERO][WORLD] %s complete in %.3fs", phaseName, seconds))
+    return result
+end
+
+local function markBuildFailed(root, message)
+    if root and root.Parent then
+        root:SetAttribute("BuildComplete", false)
+        root:SetAttribute("BuildState", "Failed")
+        root:SetAttribute("BuildError", string.sub(tostring(message), 1, 900))
+    end
+    workspace:SetAttribute("ISLEZeroGenerated", false)
+    workspace:SetAttribute("ISLEZeroBuildState", "Failed")
 end
 
 function WorldBuilder.Build()
@@ -47,34 +78,85 @@ function WorldBuilder.Build()
     SpawnFlow.Prepare(config)
     local root = createRoot()
 
-    AtmosphereBuilder.Build(config)
-    local terrainState = TerrainBuilder.Build(config)
-    CoastBuilder.Build(config, root, TerrainBuilder.HeightAt)
-    NaturalFeatureBuilder.Build(config, root, TerrainBuilder.HeightAt)
+    workspace:SetAttribute("ISLEZeroGenerated", false)
+    workspace:SetAttribute("ISLEZeroBuildState", "Building")
 
-    -- Paths are laid before vegetation so tree placement can reserve walkable
-    -- corridors and we do not end up with trunks in the middle of the trail.
-    PathBuilder.Build(config, root, TerrainBuilder.HeightAt)
-    LandmarkBuilder.Build(config, root, terrainState, TerrainBuilder.HeightAt)
-    VegetationBuilder.Build(
-        config,
-        root,
-        TerrainBuilder.HeightAt,
-        PathBuilder.DistanceToAnyPath
-    )
+    local ok, result = pcall(function()
+        runPhase(root, "Atmosphere", function()
+            AtmosphereBuilder.Build(config)
+        end)
 
-    local audit = WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
-    local spawnReleased = SpawnFlow.Release(root)
-    root:SetAttribute("SpawnReleased", spawnReleased)
+        local terrainState = runPhase(root, "Terrain", function()
+            return TerrainBuilder.Build(config)
+        end)
 
-    workspace:SetAttribute("ISLEZeroWorldVersion", config.WorldVersion)
-    workspace:SetAttribute("ISLEZeroWorldSeed", config.Seed)
-    workspace:SetAttribute("ISLEZeroGenerated", true)
-    workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
-    workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors)
-    workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings)
+        runPhase(root, "Coast", function()
+            CoastBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
 
-    return root
+        runPhase(root, "NaturalFeatures", function()
+            NaturalFeatureBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
+
+        -- Paths are laid before vegetation so tree placement can reserve walkable
+        -- corridors and we do not end up with trunks in the middle of the trail.
+        runPhase(root, "Paths", function()
+            PathBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "Landmarks", function()
+            LandmarkBuilder.Build(config, root, terrainState, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "Vegetation", function()
+            VegetationBuilder.Build(
+                config,
+                root,
+                TerrainBuilder.HeightAt,
+                PathBuilder.DistanceToAnyPath
+            )
+        end)
+
+        local audit = runPhase(root, "Audit", function()
+            return WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
+        end)
+
+        if #audit.errors > 0 then
+            error(string.format("World audit found %d blocking error(s)", #audit.errors), 0)
+        end
+
+        local spawnReleased = runPhase(root, "SpawnRelease", function()
+            return SpawnFlow.Release(root)
+        end)
+        root:SetAttribute("SpawnReleased", spawnReleased)
+
+        if not spawnReleased then
+            error("CrashBeachSpawn could not be activated", 0)
+        end
+
+        root:SetAttribute("BuildComplete", true)
+        root:SetAttribute("BuildState", "Ready")
+        root:SetAttribute("CurrentPhase", "Ready")
+        root:SetAttribute("BuildError", nil)
+
+        workspace:SetAttribute("ISLEZeroWorldVersion", config.WorldVersion)
+        workspace:SetAttribute("ISLEZeroWorldSeed", config.Seed)
+        workspace:SetAttribute("ISLEZeroGenerated", true)
+        workspace:SetAttribute("ISLEZeroBuildState", "Ready")
+        workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
+        workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors)
+        workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings)
+
+        return root
+    end)
+
+    if not ok then
+        markBuildFailed(root, result)
+        warn("[ISLE//ZERO][WORLD] Build stopped. Temporary generation spawn is being kept for player safety.")
+        error(result, 0)
+    end
+
+    return result
 end
 
 function WorldBuilder.NeedsBuild()
@@ -82,7 +164,13 @@ function WorldBuilder.NeedsBuild()
     if not root then
         return true
     end
-    return root:GetAttribute("WorldVersion") ~= config.WorldVersion
+    if root:GetAttribute("WorldVersion") ~= config.WorldVersion then
+        return true
+    end
+    if root:GetAttribute("BuildComplete") ~= true then
+        return true
+    end
+    return root:GetAttribute("BuildState") ~= "Ready"
 end
 
 return WorldBuilder
