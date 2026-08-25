@@ -15,6 +15,7 @@ local SpawnFlow = require(script.Parent.SpawnFlow)
 local WorldBuilder = {}
 
 local WORLD_NAME = "ISLE_ZERO_WORLD"
+local buildInProgress = false
 
 local function removeTemplateObjects()
     for _, name in ipairs({"Baseplate", "SpawnLocation"}) do
@@ -78,15 +79,22 @@ function WorldBuilder.Build()
     -- Baseplate or moving players to the temporary generation platform.
     WorldPreflight.Assert(config)
 
-    local started = os.clock()
-    removeTemplateObjects()
-    SpawnFlow.Prepare(config)
-    local root = createRoot()
+    if buildInProgress then
+        error("A world build is already in progress", 0)
+    end
+    buildInProgress = true
 
-    workspace:SetAttribute("ISLEZeroGenerated", false)
-    workspace:SetAttribute("ISLEZeroBuildState", "Building")
+    local started = os.clock()
+    local root = nil
 
     local ok, result = pcall(function()
+        removeTemplateObjects()
+        SpawnFlow.Prepare(config)
+        root = createRoot()
+
+        workspace:SetAttribute("ISLEZeroGenerated", false)
+        workspace:SetAttribute("ISLEZeroBuildState", "Building")
+
         runPhase(root, "Atmosphere", function()
             AtmosphereBuilder.Build(config)
         end)
@@ -94,6 +102,8 @@ function WorldBuilder.Build()
         local terrainState = runPhase(root, "Terrain", function()
             return TerrainBuilder.Build(config)
         end)
+        root:SetAttribute("TerrainSampledCells", terrainState.SampledCells or 0)
+        root:SetAttribute("TerrainFilledColumns", terrainState.FilledColumns or 0)
 
         runPhase(root, "Coast", function()
             CoastBuilder.Build(config, root, TerrainBuilder.HeightAt)
@@ -155,6 +165,8 @@ function WorldBuilder.Build()
         return root
     end)
 
+    buildInProgress = false
+
     if not ok then
         markBuildFailed(root, result)
         warn("[ISLE//ZERO][WORLD] Build stopped. Temporary generation spawn is being kept for player safety.")
@@ -162,6 +174,10 @@ function WorldBuilder.Build()
     end
 
     return result
+end
+
+function WorldBuilder.IsBuilding()
+    return buildInProgress
 end
 
 function WorldBuilder.NeedsBuild()
