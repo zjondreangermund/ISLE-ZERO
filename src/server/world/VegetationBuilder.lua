@@ -38,6 +38,13 @@ local function tooCloseToLandmark(config, position)
             return true
         end
     end
+
+    for _, zone in pairs(config.ScenicZones or {}) do
+        if horizontalDistance(position, zone.Position) < zone.Radius then
+            return true
+        end
+    end
+
     return false
 end
 
