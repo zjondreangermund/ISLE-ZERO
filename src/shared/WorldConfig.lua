@@ -43,6 +43,7 @@ local WorldConfig = {
         WarnPathGrade = 0.65,
         WarnGeneratedDescendants = 14000,
         MaxGeneratedDescendants = 22000,
+        MinTreeCount = 3000,
     },
 
     Locations = {
