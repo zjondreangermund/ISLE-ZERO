@@ -1,5 +1,5 @@
 local WorldConfig = {
-    WorldVersion = 3,
+    WorldVersion = 4,
     Seed = 7102026,
 
     SeaLevel = 0,
@@ -9,21 +9,18 @@ local WorldConfig = {
     Island = {
         HalfX = 1180,
         HalfZ = 980,
-        Grid = 32,
+        Grid = 20,
         BaseY = -72,
-        BeachBand = 0.28,
+        BeachBand = 0.30,
     },
 
     Generation = {
-        YieldEvery = 180,
+        YieldEvery = 140,
         ClearExisting = true,
         VegetationDensity = 1.0,
     },
 
     Vegetation = {
-        -- Targets are deliberately high enough to read as a real island forest
-        -- from both ground level and aerial views. The builder still respects
-        -- trails, landmarks, beaches, steep/high terrain and minimum spacing.
         JungleTreeTarget = 2800,
         PalmTarget = 420,
         MangroveTarget = 300,
@@ -36,13 +33,37 @@ local WorldConfig = {
         PathClearance = 9,
         ForestNoiseScale = 185,
         ForestNoiseBias = -0.34,
-        MaxTreeElevation = 235,
+        MaxTreeElevation = 250,
+    },
+
+    Waterways = {
+        MainRiver = {
+            Vector3.new(-65, 0, -495),
+            Vector3.new(-105, 0, -430),
+            Vector3.new(-155, 0, -350),
+            Vector3.new(-225, 0, -265),
+            Vector3.new(-260, 0, -205),
+            Vector3.new(-265, 0, -145),
+            Vector3.new(-325, 0, -65),
+            Vector3.new(-405, 0, 25),
+            Vector3.new(-500, 0, 115),
+            Vector3.new(-610, 0, 205),
+            Vector3.new(-735, 0, 265),
+            Vector3.new(-875, 0, 315),
+            Vector3.new(-1035, 0, 355),
+        },
+        RiverWidth = 24,
+        RiverDepth = 8,
+        RiverBankBlend = 62,
+        PoolCenter = Vector3.new(-275, 0, -115),
+        PoolRadius = 50,
+        PoolDepth = 10,
     },
 
     Audit = {
         WarnPathGrade = 0.65,
-        WarnGeneratedDescendants = 14000,
-        MaxGeneratedDescendants = 22000,
+        WarnGeneratedDescendants = 15000,
+        MaxGeneratedDescendants = 24000,
         MinTreeCount = 3000,
     },
 
