@@ -12,6 +12,16 @@ local function record(report, level, message)
     table.insert(report[level], message)
 end
 
+local function countNamedDescendants(model, name)
+    local count = 0
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant.Name == name then
+            count += 1
+        end
+    end
+    return count
+end
+
 function ExplorationAudit.Run(config, root, heightAt)
     local report = {
         errors = {},
@@ -56,13 +66,37 @@ function ExplorationAudit.Run(config, root, heightAt)
         record(report, "errors", string.format("Only %d trail signs generated; expected at least %d", signCount, minimumSigns))
     end
 
+    local totalChests = 0
     if cavesFolder then
         for caveId, cave in pairs(exploration.Caves or {}) do
             local model = cavesFolder:FindFirstChild(caveId)
             if not model then
                 record(report, "errors", "Missing cave model: " .. caveId)
-            elseif not model:FindFirstChild("DiscoveryMarker") then
-                record(report, "warnings", "Cave has no discovery marker: " .. caveId)
+            else
+                local branchCount = model:GetAttribute("BranchCount") or 0
+                local chestCount = countNamedDescendants(model, "ChestBody")
+                local guardianCount = countNamedDescendants(model, "GuardianSpawn")
+                local campCount = countNamedDescendants(model, "CampBuildSpot")
+                totalChests += chestCount
+
+                if branchCount < 3 then
+                    record(report, "errors", string.format("%s has only %d treasure branches", caveId, branchCount))
+                end
+                if chestCount < 3 then
+                    record(report, "errors", string.format("%s has only %d loot chests", caveId, chestCount))
+                end
+                if guardianCount ~= 1 then
+                    record(report, "errors", string.format("%s has %d guardian spawn markers; expected 1", caveId, guardianCount))
+                end
+                if campCount ~= 1 then
+                    record(report, "errors", string.format("%s has %d safe-camp build spots; expected 1", caveId, campCount))
+                end
+                if not model:GetAttribute("GuardianType") then
+                    record(report, "errors", caveId .. " has no GuardianType")
+                end
+                if (model:GetAttribute("TunnelNodeCount") or 0) < 5 then
+                    record(report, "warnings", caveId .. " has a short main descent")
+                end
             end
 
             local entrance = cave.Entrance
@@ -97,8 +131,10 @@ function ExplorationAudit.Run(config, root, heightAt)
     root:SetAttribute("CaveCount", caveCount)
     root:SetAttribute("ExplorationSiteCount", siteCount)
     root:SetAttribute("TrailSignCount", signCount)
+    root:SetAttribute("CaveLootChestCount", totalChests)
 
     record(report, "info", string.format("Caves: %d/%d", caveCount, configuredCaves))
+    record(report, "info", string.format("Cave treasure chests: %d", totalChests))
     record(report, "info", string.format("Surface exploration sites: %d/%d", siteCount, configuredSites))
     record(report, "info", string.format("Wooden signposts: %d/%d", signCount, configuredSigns))
 
