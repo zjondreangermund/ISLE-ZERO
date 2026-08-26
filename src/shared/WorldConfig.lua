@@ -1,5 +1,5 @@
 local WorldConfig = {
-    WorldVersion = 4,
+    WorldVersion = 5,
     Seed = 7102026,
 
     SeaLevel = 0,
@@ -60,11 +60,173 @@ local WorldConfig = {
         PoolDepth = 10,
     },
 
+    Exploration = {
+        Caves = {
+            WaterfallCave = {
+                DiscoveryName = "Whisperfall Cave",
+                Entrance = Vector3.new(-315, 0, -160),
+                Nodes = {
+                    Vector3.new(-315, -5, -160),
+                    Vector3.new(-345, -13, -186),
+                    Vector3.new(-382, -19, -216),
+                    Vector3.new(-420, -23, -248),
+                },
+                TunnelRadius = 13,
+                ChamberRadius = 27,
+                ClearingRadius = 34,
+                Props = "Expedition",
+            },
+            SmugglerGrotto = {
+                DiscoveryName = "Smuggler's Grotto",
+                Entrance = Vector3.new(900, 0, 390),
+                Nodes = {
+                    Vector3.new(900, -5, 390),
+                    Vector3.new(860, -13, 360),
+                    Vector3.new(815, -19, 326),
+                    Vector3.new(770, -23, 300),
+                },
+                TunnelRadius = 12,
+                ChamberRadius = 25,
+                ClearingRadius = 30,
+                Props = "Smuggler",
+            },
+            MountainPassCave = {
+                DiscoveryName = "Split-Rock Passage",
+                Entrance = Vector3.new(-390, 0, -500),
+                Nodes = {
+                    Vector3.new(-390, -6, -500),
+                    Vector3.new(-345, -16, -535),
+                    Vector3.new(-292, -23, -568),
+                    Vector3.new(-238, -27, -600),
+                },
+                TunnelRadius = 14,
+                ChamberRadius = 23,
+                ClearingRadius = 28,
+                Props = "Natural",
+            },
+            TempleUndercroft = {
+                DiscoveryName = "Temple Undercroft",
+                Entrance = Vector3.new(250, 0, -520),
+                Nodes = {
+                    Vector3.new(250, -6, -520),
+                    Vector3.new(218, -15, -545),
+                    Vector3.new(182, -22, -570),
+                    Vector3.new(145, -28, -594),
+                },
+                TunnelRadius = 12,
+                ChamberRadius = 25,
+                ClearingRadius = 28,
+                Props = "Temple",
+            },
+            BunkerServiceTunnel = {
+                DiscoveryName = "Service Tunnel 03",
+                Entrance = Vector3.new(900, 0, 45),
+                Nodes = {
+                    Vector3.new(900, -5, 45),
+                    Vector3.new(873, -13, 18),
+                    Vector3.new(848, -18, -8),
+                    Vector3.new(823, -20, -38),
+                },
+                TunnelRadius = 11,
+                ChamberRadius = 18,
+                ClearingRadius = 25,
+                Props = "Bunker",
+            },
+        },
+
+        Sites = {
+            AbandonedCamp = {
+                DiscoveryName = "Abandoned Jungle Camp",
+                Kind = "Camp",
+                Position = Vector3.new(-40, 0, 420),
+                Radius = 45,
+            },
+            HiddenShrine = {
+                DiscoveryName = "Moss Shrine",
+                Kind = "Shrine",
+                Position = Vector3.new(-70, 0, -395),
+                Radius = 38,
+            },
+            ExpeditionRemains = {
+                DiscoveryName = "Expedition Remains",
+                Kind = "Expedition",
+                Position = Vector3.new(-470, 0, -245),
+                Radius = 30,
+            },
+            SupplyCache = {
+                DiscoveryName = "Weathered Supply Cache",
+                Kind = "Cache",
+                Position = Vector3.new(585, 0, 120),
+                Radius = 28,
+            },
+            MangroveDock = {
+                DiscoveryName = "Old Mangrove Dock",
+                Kind = "Dock",
+                Position = Vector3.new(-865, 0, 285),
+                Radius = 44,
+            },
+            CliffOverlook = {
+                DiscoveryName = "Stormwatch Overlook",
+                Kind = "Overlook",
+                Position = Vector3.new(875, 0, -430),
+                Radius = 34,
+            },
+            TidePools = {
+                DiscoveryName = "South Tide Pools",
+                Kind = "TidePools",
+                Position = Vector3.new(720, 0, 630),
+                Radius = 42,
+            },
+        },
+
+        Signposts = {
+            {
+                Name = "CrashTrailSign",
+                Position = Vector3.new(95, 0, 610),
+                Yaw = -12,
+                Lines = {"OLD VILLAGE  >", "<  CRASH BEACH"},
+            },
+            {
+                Name = "VillageCrossroadsSign",
+                Position = Vector3.new(345, 0, 175),
+                Yaw = 16,
+                Lines = {"<  RIVER", "EAST CLIFF  >", "RIDGE TRAIL  >"},
+            },
+            {
+                Name = "RiverTrailSign",
+                Position = Vector3.new(-145, 0, -105),
+                Yaw = -28,
+                Lines = {"<  WATERFALL", "RIDGE TRAIL  >", "OLD VILLAGE  >"},
+            },
+            {
+                Name = "EastTrailSign",
+                Position = Vector3.new(710, 0, 75),
+                Yaw = 34,
+                Lines = {"BUNKER  >", "LOOKOUT  >", "<  OLD VILLAGE"},
+            },
+            {
+                Name = "MangroveTrailSign",
+                Position = Vector3.new(-610, 0, 390),
+                Yaw = -48,
+                Lines = {"MANGROVES  >", "<  CRASH BEACH"},
+            },
+            {
+                Name = "RidgeTrailSign",
+                Position = Vector3.new(55, 0, -495),
+                Yaw = 8,
+                Lines = {"RIDGE RUINS  >", "ZERO PEAK  >", "<  RIVER"},
+            },
+        },
+    },
+
     Audit = {
         WarnPathGrade = 0.65,
-        WarnGeneratedDescendants = 15000,
-        MaxGeneratedDescendants = 24000,
+        WarnGeneratedDescendants = 16500,
+        MaxGeneratedDescendants = 26000,
         MinTreeCount = 3000,
+        MinCaveCount = 5,
+        MinExplorationSiteCount = 7,
+        MinSignpostCount = 6,
     },
 
     Locations = {
