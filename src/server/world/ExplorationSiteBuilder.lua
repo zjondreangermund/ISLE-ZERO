@@ -190,7 +190,7 @@ local function buildExpedition(model, center)
         "FieldJournal",
         Vector3.new(2.2, 0.35, 2.8),
         CFrame.new(center + Vector3.new(-1, 0.7, 5)) * CFrame.Angles(0, -0.4, 0.04),
-        Enum.Material.Leather,
+        Enum.Material.Fabric,
         Color3.fromRGB(89, 61, 39)
     )
     journal.CanCollide = false
