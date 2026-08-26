@@ -33,6 +33,17 @@ local function horizontalDistance(a, b)
     return Vector2.new(a.X - b.X, a.Z - b.Z).Magnitude
 end
 
+local function isOffshoreRegion(config, name)
+    local regions = config.Regions or {}
+    local region = regions[name]
+    local island = config.Island
+    if not region or not island or typeof(region.Center) ~= "Vector3" then
+        return false
+    end
+
+    return math.abs(region.Center.X) > island.HalfX or math.abs(region.Center.Z) > island.HalfZ
+end
+
 local function auditPathGrades(config, heightAt, report)
     local warningGrade = (config.Audit and config.Audit.WarnPathGrade) or 0.65
     local sampleSpacing = 18
@@ -229,10 +240,16 @@ function WorldAudit.Run(config, root, heightAt)
 
     local landmarkPositions = {}
     for name, position in pairs(config.Locations) do
-        local height = heightAt(config, position.X, position.Z)
-        landmarkPositions[name] = Vector3.new(position.X, height, position.Z)
-        if height <= config.SeaLevel then
-            record(report, "errors", name .. " is configured outside playable land")
+        local offshore = isOffshoreRegion(config, name)
+        if offshore then
+            landmarkPositions[name] = position
+            record(report, "info", name .. " is an offshore progression region; land validation is handled by RegionAudit")
+        else
+            local height = heightAt(config, position.X, position.Z)
+            landmarkPositions[name] = Vector3.new(position.X, height, position.Z)
+            if height <= config.SeaLevel then
+                record(report, "errors", name .. " is configured outside playable land")
+            end
         end
     end
 
