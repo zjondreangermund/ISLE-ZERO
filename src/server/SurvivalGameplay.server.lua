@@ -68,11 +68,7 @@ local function stateFor(player)
 end
 
 local function inventoryCopy(inventory)
-    local result = {}
-    for key, value in pairs(inventory) do
-        result[key] = value
-    end
-    return result
+    return table.clone(inventory)
 end
 
 local function makeStatePacket(player)
@@ -139,12 +135,19 @@ local function updateLeaderstats(player)
 end
 
 local function hasTool(player, itemId)
-    for _, container in ipairs({player:FindFirstChildOfClass("Backpack"), player.Character}) do
-        if container then
-            for _, child in ipairs(container:GetChildren()) do
-                if child:IsA("Tool") and child:GetAttribute("ItemId") == itemId then
-                    return true
-                end
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    local containers = {}
+    if backpack then
+        table.insert(containers, backpack)
+    end
+    if player.Character then
+        table.insert(containers, player.Character)
+    end
+
+    for _, container in ipairs(containers) do
+        for _, child in ipairs(container:GetChildren()) do
+            if child:IsA("Tool") and child:GetAttribute("ItemId") == itemId then
+                return true
             end
         end
     end
@@ -285,27 +288,27 @@ local function createSurfacePickup(parent, entry, ground)
         return nil
     end
 
-    local part = Instance.new("Part")
-    part.Name = "Pickup_" .. entry.Id
-    part.Anchored = true
-    part.CanCollide = false
-    part.CanTouch = false
-    part.Material = entry.ItemId == "Machete" and Enum.Material.Metal or Enum.Material.SmoothPlastic
-    part.Color = definition.Color or Color3.fromRGB(125, 125, 120)
-    part.Size = pickupSize(entry.ItemId)
-    part.CFrame = CFrame.new(ground + Vector3.new(0, part.Size.Y / 2 + 0.35, 0)) * CFrame.Angles(0, math.rad(18), entry.ItemId == "Machete" and math.rad(70) or 0)
-    part:SetAttribute("ItemId", entry.ItemId)
-    part:SetAttribute("Amount", entry.Amount or 1)
-    part:SetAttribute("PickupId", entry.Id)
-    part.Parent = parent
-    CollectionService:AddTag(part, "WorldPickup")
+    local object = Instance.new("Part")
+    object.Name = "Pickup_" .. entry.Id
+    object.Anchored = true
+    object.CanCollide = false
+    object.CanTouch = false
+    object.Material = entry.ItemId == "Machete" and Enum.Material.Metal or Enum.Material.SmoothPlastic
+    object.Color = definition.Color or Color3.fromRGB(125, 125, 120)
+    object.Size = pickupSize(entry.ItemId)
+    object.CFrame = CFrame.new(ground + Vector3.new(0, object.Size.Y / 2 + 0.35, 0)) * CFrame.Angles(0, math.rad(18), entry.ItemId == "Machete" and math.rad(70) or 0)
+    object:SetAttribute("ItemId", entry.ItemId)
+    object:SetAttribute("Amount", entry.Amount or 1)
+    object:SetAttribute("PickupId", entry.Id)
+    object.Parent = parent
+    CollectionService:AddTag(object, "WorldPickup")
 
     if entry.ItemId == "Torch" then
         local light = Instance.new("PointLight")
         light.Brightness = 1.2
         light.Range = 15
         light.Color = Color3.fromRGB(255, 190, 112)
-        light.Parent = part
+        light.Parent = object
     end
 
     local prompt = Instance.new("ProximityPrompt")
@@ -315,8 +318,8 @@ local function createSurfacePickup(parent, entry, ground)
     prompt.HoldDuration = 0.15
     prompt.MaxActivationDistance = 10
     prompt.RequiresLineOfSight = false
-    prompt.Parent = part
-    return part
+    prompt.Parent = object
+    return object
 end
 
 local function seedStarterPickups(root)
@@ -334,40 +337,40 @@ local function seedStarterPickups(root)
     end
 end
 
-local function bindPickup(part)
-    if part:GetAttribute("SurvivalBound") then
+local function bindPickup(object)
+    if object:GetAttribute("SurvivalBound") then
         return
     end
-    part:SetAttribute("SurvivalBound", true)
+    object:SetAttribute("SurvivalBound", true)
 
-    local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+    local prompt = object:FindFirstChildOfClass("ProximityPrompt")
     if not prompt then
         prompt = Instance.new("ProximityPrompt")
         prompt.ActionText = "Pick up"
         prompt.MaxActivationDistance = 10
         prompt.RequiresLineOfSight = false
-        prompt.Parent = part
+        prompt.Parent = object
     end
 
-    local itemId = part:GetAttribute("ItemId")
+    local itemId = object:GetAttribute("ItemId")
     local definition = itemId and GameplayConfig.Items[itemId]
     if definition then
         prompt.ObjectText = definition.DisplayName or itemId
     end
 
     prompt.Triggered:Connect(function(player)
-        if not part.Parent then
+        if not object.Parent then
             return
         end
-        local id = part:GetAttribute("ItemId")
-        local amount = part:GetAttribute("Amount") or 1
+        local id = object:GetAttribute("ItemId")
+        local amount = object:GetAttribute("Amount") or 1
         local item = id and GameplayConfig.Items[id]
         if not item then
             return
         end
         addItem(player, id, amount)
         toast(player, string.format("Picked up %s%s", item.DisplayName or id, amount > 1 and (" x" .. tostring(amount)) or ""))
-        part:Destroy()
+        object:Destroy()
     end)
 end
 
@@ -445,18 +448,18 @@ local function bindChest(base)
 end
 
 local function tentPart(parent, name, size, cframe, material, color)
-    local part = Instance.new("Part")
-    part.Name = name
-    part.Anchored = true
-    part.CanTouch = false
-    part.Size = size
-    part.CFrame = cframe
-    part.Material = material
-    part.Color = color
-    part.TopSurface = Enum.SurfaceType.Smooth
-    part.BottomSurface = Enum.SurfaceType.Smooth
-    part.Parent = parent
-    return part
+    local object = Instance.new("Part")
+    object.Name = name
+    object.Anchored = true
+    object.CanTouch = false
+    object.Size = size
+    object.CFrame = cframe
+    object.Material = material
+    object.Color = color
+    object.TopSurface = Enum.SurfaceType.Smooth
+    object.BottomSurface = Enum.SurfaceType.Smooth
+    object.Parent = parent
+    return object
 end
 
 local function setCamp(player, caveId, cframe)
@@ -561,26 +564,26 @@ local function bindCampSpot(marker)
 end
 
 local function animalPart(model, name, size, cframe, color, material)
-    local part = Instance.new("Part")
-    part.Name = name
-    part.Size = size
-    part.CFrame = cframe
-    part.Color = color
-    part.Material = material or Enum.Material.SmoothPlastic
-    part.Anchored = false
-    part.CanCollide = false
-    part.CanTouch = false
-    part.Massless = true
-    part.TopSurface = Enum.SurfaceType.Smooth
-    part.BottomSurface = Enum.SurfaceType.Smooth
-    part.Parent = model
-    return part
+    local object = Instance.new("Part")
+    object.Name = name
+    object.Size = size
+    object.CFrame = cframe
+    object.Color = color
+    object.Material = material or Enum.Material.SmoothPlastic
+    object.Anchored = false
+    object.CanCollide = false
+    object.CanTouch = false
+    object.Massless = true
+    object.TopSurface = Enum.SurfaceType.Smooth
+    object.BottomSurface = Enum.SurfaceType.Smooth
+    object.Parent = model
+    return object
 end
 
-local function weld(root, part)
+local function weld(root, object)
     local constraint = Instance.new("WeldConstraint")
     constraint.Part0 = root
-    constraint.Part1 = part
+    constraint.Part1 = object
     constraint.Parent = root
 end
 
@@ -675,15 +678,15 @@ local function createGuardian(marker)
             local nearestHumanoid = nil
             local nearestDistance = math.huge
 
-            for _, player in ipairs(Players:GetPlayers()) do
-                local character = player.Character
+            for _, currentPlayer in ipairs(Players:GetPlayers()) do
+                local character = currentPlayer.Character
                 local targetRoot = character and character:FindFirstChild("HumanoidRootPart")
                 local targetHumanoid = character and character:FindFirstChildOfClass("Humanoid")
                 if targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
                     local distance = (targetRoot.Position - root.Position).Magnitude
                     if distance < nearestDistance then
                         nearestDistance = distance
-                        nearestPlayer = player
+                        nearestPlayer = currentPlayer
                         nearestRoot = targetRoot
                         nearestHumanoid = targetHumanoid
                     end
