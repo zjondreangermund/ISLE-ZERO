@@ -11,6 +11,7 @@ local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local ExplorationSiteBuilder = require(script.Parent.ExplorationSiteBuilder)
 local SignpostBuilder = require(script.Parent.SignpostBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
+local ExplorationClearing = require(script.Parent.ExplorationClearing)
 local WorldAudit = require(script.Parent.WorldAudit)
 local WorldPreflight = require(script.Parent.WorldPreflight)
 local SpawnFlow = require(script.Parent.SpawnFlow)
@@ -129,14 +130,6 @@ function WorldBuilder.Build()
             LandmarkBuilder.Build(config, root, terrainState, TerrainBuilder.HeightAt)
         end)
 
-        runPhase(root, "ExplorationSites", function()
-            ExplorationSiteBuilder.Build(config, root, TerrainBuilder.HeightAt)
-        end)
-
-        runPhase(root, "TrailSigns", function()
-            SignpostBuilder.Build(config, root, TerrainBuilder.HeightAt)
-        end)
-
         runPhase(root, "Vegetation", function()
             VegetationBuilder.Build(
                 config,
@@ -144,6 +137,18 @@ function WorldBuilder.Build()
                 TerrainBuilder.HeightAt,
                 PathBuilder.DistanceToAnyPath
             )
+        end)
+
+        runPhase(root, "ExplorationClearings", function()
+            ExplorationClearing.Apply(config, root)
+        end)
+
+        runPhase(root, "ExplorationSites", function()
+            ExplorationSiteBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "TrailSigns", function()
+            SignpostBuilder.Build(config, root, TerrainBuilder.HeightAt)
         end)
 
         local audit = runPhase(root, "Audit", function()
