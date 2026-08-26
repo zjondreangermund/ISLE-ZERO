@@ -12,6 +12,15 @@ local function add(report, level, message)
     table.insert(report[level], message)
 end
 
+local function validatePositiveSetting(report, settings, key, maximum)
+    local value = settings[key]
+    if not isFiniteNumber(value) or value <= 0 then
+        add(report, "errors", "Vegetation." .. key .. " must be greater than zero")
+    elseif maximum and value > maximum then
+        add(report, "warnings", string.format("Vegetation.%s is very high (%s > %s)", key, tostring(value), tostring(maximum)))
+    end
+end
+
 function WorldPreflight.Run(config)
     local report = {
         errors = {},
@@ -86,6 +95,42 @@ function WorldPreflight.Run(config)
         end
     end
 
+    local vegetation = config.Vegetation
+    if vegetation ~= nil then
+        if type(vegetation) ~= "table" then
+            add(report, "errors", "Vegetation settings must be a table")
+        else
+            validatePositiveSetting(report, vegetation, "JungleTreeTarget", 6000)
+            validatePositiveSetting(report, vegetation, "PalmTarget", 1200)
+            validatePositiveSetting(report, vegetation, "MangroveTarget", 900)
+            validatePositiveSetting(report, vegetation, "UnderstoryTarget", 4000)
+            validatePositiveSetting(report, vegetation, "RockTarget", 1000)
+            validatePositiveSetting(report, vegetation, "MaxAttemptsMultiplier", 12)
+            validatePositiveSetting(report, vegetation, "TreeSpacing", 30)
+            validatePositiveSetting(report, vegetation, "PalmSpacing", 35)
+            validatePositiveSetting(report, vegetation, "MangroveSpacing", 25)
+            validatePositiveSetting(report, vegetation, "PathClearance", 30)
+            validatePositiveSetting(report, vegetation, "ForestNoiseScale", 600)
+            validatePositiveSetting(report, vegetation, "MaxTreeElevation", 600)
+
+            if not isFiniteNumber(vegetation.ForestNoiseBias) or vegetation.ForestNoiseBias < -1 or vegetation.ForestNoiseBias > 1 then
+                add(report, "errors", "Vegetation.ForestNoiseBias must be between -1 and 1")
+            end
+
+            local density = generation and generation.VegetationDensity or 1
+            if isFiniteNumber(density) then
+                local projectedTrees = math.floor((vegetation.JungleTreeTarget or 0) * density)
+                    + math.floor((vegetation.PalmTarget or 0) * density)
+                    + math.floor((vegetation.MangroveTarget or 0) * density)
+                if projectedTrees > 8000 then
+                    add(report, "warnings", string.format("Projected tree target is very high: %d", projectedTrees))
+                end
+            end
+        end
+    else
+        add(report, "warnings", "No Vegetation settings table is configured")
+    end
+
     local audit = config.Audit
     if audit ~= nil then
         if type(audit) ~= "table" then
@@ -101,6 +146,9 @@ function WorldPreflight.Run(config)
                 add(report, "errors", "Audit.MaxGeneratedDescendants must be at least 1")
             elseif isFiniteNumber(audit.WarnGeneratedDescendants) and audit.MaxGeneratedDescendants <= audit.WarnGeneratedDescendants then
                 add(report, "errors", "Audit.MaxGeneratedDescendants must be above WarnGeneratedDescendants")
+            end
+            if audit.MinTreeCount ~= nil and (not isFiniteNumber(audit.MinTreeCount) or audit.MinTreeCount < 0) then
+                add(report, "errors", "Audit.MinTreeCount must be zero or greater")
             end
         end
     end
