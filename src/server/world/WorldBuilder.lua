@@ -16,6 +16,7 @@ local SignpostBuilder = require(script.Parent.SignpostBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
 local ExplorationClearing = require(script.Parent.ExplorationClearing)
 local ExplorationAudit = require(script.Parent.ExplorationAudit)
+local RegionAudit = require(script.Parent.RegionAudit)
 local WorldAudit = require(script.Parent.WorldAudit)
 local WorldPreflight = require(script.Parent.WorldPreflight)
 local SpawnFlow = require(script.Parent.SpawnFlow)
@@ -166,6 +167,13 @@ function WorldBuilder.Build()
             error(string.format("Exploration audit found %d blocking error(s)", #explorationAudit.errors), 0)
         end
 
+        local regionAudit = runPhase(root, "RegionAudit", function()
+            return RegionAudit.Run(config, gameplayConfig, root)
+        end)
+        if #regionAudit.errors > 0 then
+            error(string.format("Region audit found %d blocking error(s)", #regionAudit.errors), 0)
+        end
+
         local audit = runPhase(root, "Audit", function()
             return WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
         end)
@@ -194,8 +202,8 @@ function WorldBuilder.Build()
         workspace:SetAttribute("ISLEZeroBuildState", "Ready")
         workspace:SetAttribute("ISLEZeroCurrentPhase", "Ready")
         workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
-        workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors + #explorationAudit.errors)
-        workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings + #explorationAudit.warnings)
+        workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors + #explorationAudit.errors + #regionAudit.errors)
+        workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings + #explorationAudit.warnings + #regionAudit.warnings)
 
         return root
     end)
