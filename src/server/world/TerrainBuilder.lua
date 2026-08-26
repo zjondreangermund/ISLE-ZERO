@@ -70,14 +70,21 @@ function TerrainBuilder.HeightAt(config, x, z)
     local detailNoise = math.noise(x / 105, z / 105, config.Seed * 0.002) * 4.2
     height += broadNoise + detailNoise
 
-    local northernMassif = gaussian(x, z, -90, -650, 390, 335)
-    height += northernMassif * 180
-    height += gaussian(x, z, 260, -500, 345, 245) * 68
-    height += gaussian(x, z, 760, -180, 245, 420) * 60
+    -- Northern Frostpeak is deliberately a multi-peak massif rather than a
+    -- single dome. Stonefall occupies the eastern shoulder below it.
+    local frostCore = gaussian(x, z, -155, -690, 365, 305)
+    local frostWest = gaussian(x, z, -355, -675, 230, 235)
+    local frostEast = gaussian(x, z, 40, -735, 235, 220)
+    height += frostCore * 174
+    height += frostWest * 72
+    height += frostEast * 58
 
-    -- Calm the small-scale noise on the mountain so it reads as broad geology
-    -- rather than a pile of voxel steps.
-    height -= detailNoise * northernMassif * 0.72
+    local stonefallShoulder = gaussian(x, z, 280, -500, 330, 245)
+    height += stonefallShoulder * 70
+    height += gaussian(x, z, 760, -180, 245, 420) * 58
+
+    local mountainBlend = math.max(frostCore, frostWest, frostEast)
+    height -= detailNoise * mountainBlend * 0.78
 
     local villageBlend = gaussian(x, z, 360, 120, 250, 210)
     height = height * (1 - villageBlend * 0.58) + (45 + detailNoise * 0.2) * (villageBlend * 0.58)
@@ -88,16 +95,16 @@ function TerrainBuilder.HeightAt(config, x, z)
     local mangroveBlend = gaussian(x, z, -760, 190, 300, 270)
     height = height * (1 - mangroveBlend * 0.74) + 7 * (mangroveBlend * 0.74)
 
-    -- Give the ridge ruins and peak readable, buildable shelves while preserving
-    -- the mountain silhouette around them.
-    local ruinsBlend = gaussian(x, z, 160, -550, 150, 115)
-    height = height * (1 - ruinsBlend * 0.68) + (198 + broadNoise * 0.08) * (ruinsBlend * 0.68)
+    local ruinsBlend = gaussian(x, z, 260, -515, 150, 115)
+    height = height * (1 - ruinsBlend * 0.72) + (202 + broadNoise * 0.06) * (ruinsBlend * 0.72)
 
-    local summitBlend = gaussian(x, z, -90, -680, 120, 100)
-    height = height * (1 - summitBlend * 0.52) + (280 + broadNoise * 0.06) * (summitBlend * 0.52)
+    local summitBlend = gaussian(x, z, -150, -690, 125, 105)
+    height = height * (1 - summitBlend * 0.5) + (300 + broadNoise * 0.05) * (summitBlend * 0.5)
 
-    -- Broaden the river valley slightly before the actual channel is carved.
-    -- This gives the banks a natural approach instead of a vertical trench.
+    -- Keep a readable central plains basin like the illustrated world map.
+    local plainsBlend = gaussian(x, z, 80, 90, 340, 310)
+    height = height * (1 - plainsBlend * 0.32) + (55 + broadNoise * 0.25) * (plainsBlend * 0.32)
+
     local waterways = config.Waterways
     if waterways then
         local bankBlend = waterways.RiverBankBlend or 62
@@ -119,6 +126,23 @@ function TerrainBuilder.MaterialAt(config, x, z, height)
 
     if height <= 17 or radius > 0.82 then
         return Enum.Material.Sand
+    end
+
+    local frostDistance = Vector2.new(x + 150, z + 690).Magnitude
+    if z < -430 and frostDistance < 450 then
+        local snowNoise = math.noise(x / 95, z / 95, config.Seed * 0.004)
+        if height > 225 then
+            return snowNoise > 0.28 and Enum.Material.Ice or Enum.Material.Snow
+        end
+        if height > 165 then
+            if snowNoise > -0.28 then
+                return Enum.Material.Snow
+            end
+            return Enum.Material.Rock
+        end
+        if height > 125 and snowNoise > 0.38 then
+            return Enum.Material.Snow
+        end
     end
 
     local rockNoise = math.noise(x / 115, z / 115, config.Seed * 0.00083)
@@ -270,21 +294,11 @@ function TerrainBuilder.Build(config)
 
     fillRiverWater(terrain, config, river)
 
-    local caveStart = Vector3.new(-315, poolSurface + 22, -160)
-    local caveEnd = Vector3.new(-405, poolSurface + 28, -235)
-    for i = 0, 10 do
-        local t = i / 10
-        local point = caveStart:Lerp(caveEnd, t)
-        terrain:FillBall(point, 18 + math.sin(t * math.pi) * 4, Enum.Material.Air)
-    end
-
     return {
         RiverPoints = river,
         PoolCenter = poolCenter,
         PoolSurface = poolSurface,
         PoolRadius = poolRadius,
-        CaveStart = caveStart,
-        CaveEnd = caveEnd,
         SampledCells = counter,
         FilledColumns = filledColumns,
     }
