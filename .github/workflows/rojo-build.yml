@@ -23,9 +23,6 @@ jobs:
         with:
           version: v1.1.0
 
-      - name: Install toolchain
-        run: rokit install
-
       - name: Lint Luau
         run: selene src
 
