@@ -3,19 +3,76 @@ local CollectionService = game:GetService("CollectionService")
 local CoastBuilder = {}
 
 local function makePart(parent, name, size, cframe, material, color)
-    local p = Instance.new("Part")
-    p.Name = name
-    p.Anchored = true
-    p.CanCollide = true
-    p.CanTouch = false
-    p.Material = material
-    p.Color = color
-    p.Size = size
-    p.CFrame = cframe
-    p.Parent = parent
-    p:SetAttribute("GeneratedPlaceholder", true)
-    CollectionService:AddTag(p, "WorldSetDressing")
-    return p
+    local object = Instance.new("Part")
+    object.Name = name
+    object.Anchored = true
+    object.CanCollide = true
+    object.CanTouch = false
+    object.Material = material
+    object.Color = color
+    object.Size = size
+    object.CFrame = cframe
+    object.Parent = parent
+    object:SetAttribute("GeneratedPlaceholder", true)
+    CollectionService:AddTag(object, "WorldSetDressing")
+    return object
+end
+
+local function buildDesertedIsland(config, folder)
+    local terrain = workspace.Terrain
+    local center = config.Locations.DesertedIsland or Vector3.new(-1260, 12, 690)
+
+    -- Layered terrain creates a real explorable southwest island rather than a
+    -- decorative sea rock. It is intentionally unreachable by normal trails.
+    terrain:FillBall(Vector3.new(center.X, -32, center.Z), 155, Enum.Material.Rock)
+    terrain:FillBall(Vector3.new(center.X, 0, center.Z), 137, Enum.Material.Sand)
+    terrain:FillBall(Vector3.new(center.X + 8, 17, center.Z - 8), 94, Enum.Material.Grass)
+    terrain:FillBall(Vector3.new(center.X - 42, 9, center.Z + 36), 58, Enum.Material.Sand)
+
+    local island = Instance.new("Model")
+    island.Name = "DesertedIsland"
+    island.Parent = folder
+    island:SetAttribute("RegionId", "DesertedIsland")
+    island:SetAttribute("GeneratedPlaceholder", true)
+
+    local wood = Color3.fromRGB(86, 62, 38)
+    local rock = Color3.fromRGB(88, 91, 86)
+
+    -- Broken jetty where the repaired raft arrives.
+    for index = 0, 5 do
+        local plank = makePart(
+            island,
+            "OldJettyPlank",
+            Vector3.new(8, 0.7, 5.5),
+            CFrame.new(center.X + 118 + index * 5, 5 + (index % 2) * 0.25, center.Z + 8),
+            Enum.Material.WoodPlanks,
+            wood
+        )
+        plank.CanCollide = true
+    end
+    for _, x in ipairs({center.X + 118, center.X + 144}) do
+        makePart(island, "JettyPost", Vector3.new(1.3, 8, 1.3), CFrame.new(x, 2, center.Z + 4), Enum.Material.Wood, wood)
+        makePart(island, "JettyPost", Vector3.new(1.3, 8, 1.3), CFrame.new(x, 2, center.Z + 12), Enum.Material.Wood, wood)
+    end
+
+    -- Small abandoned stone shelter provides a visible objective from the raft.
+    makePart(island, "ShelterFloor", Vector3.new(24, 1, 18), CFrame.new(center.X - 15, 26, center.Z - 18), Enum.Material.Rock, rock)
+    for _, offset in ipairs({
+        Vector3.new(-10, 5, -7),
+        Vector3.new(10, 5, -7),
+        Vector3.new(-10, 5, 7),
+        Vector3.new(10, 5, 7),
+    }) do
+        makePart(island, "ShelterColumn", Vector3.new(2.5, 10, 2.5), CFrame.new(center.X - 15, 31, center.Z - 18) * CFrame.new(offset), Enum.Material.Rock, rock)
+    end
+    makePart(island, "CollapsedRoof", Vector3.new(19, 1.8, 8), CFrame.new(center.X - 15, 37, center.Z - 22) * CFrame.Angles(0.08, 0.25, 0.18), Enum.Material.Rock, rock)
+
+    local marker = makePart(island, "DesertedIslandArrival", Vector3.new(8, 1, 8), CFrame.new(center.X + 105, 12, center.Z + 8), Enum.Material.SmoothPlastic, Color3.new(1, 1, 1))
+    marker.Transparency = 1
+    marker.CanCollide = false
+    marker.CanQuery = false
+    marker:SetAttribute("TravelPoint", "DesertedIsland")
+    CollectionService:AddTag(marker, "WorldTravelPoint")
 end
 
 function CoastBuilder.Build(config, root, heightAt)
@@ -29,7 +86,7 @@ function CoastBuilder.Build(config, root, heightAt)
         {Vector3.new(1320, -18, -330), 48},
         {Vector3.new(980, -20, -1040), 54},
         {Vector3.new(-1260, -16, -410), 58},
-        {Vector3.new(-1380, -20, 390), 43},
+        {Vector3.new(-1450, -20, 300), 43},
     }
 
     for index, entry in ipairs(islets) do
@@ -40,12 +97,12 @@ function CoastBuilder.Build(config, root, heightAt)
         end
     end
 
+    buildDesertedIsland(config, folder)
+
     local rng = Random.new(config.Seed + 3321)
     local crash = config.Locations.CrashBeach
 
-    -- Driftwood and storm debris help the spawn beach feel authored before
-    -- custom meshes are available.
-    for _ = 1, 18 do
+    for _ = 1, 22 do
         local x = crash.X + rng:NextNumber(-320, 320)
         local z = crash.Z + rng:NextNumber(-110, 140)
         local y = heightAt(config, x, z)
@@ -64,8 +121,6 @@ function CoastBuilder.Build(config, root, heightAt)
         end
     end
 
-    -- Extra sea stacks along the east coast break up the horizon and reinforce
-    -- the rougher cliff-side identity of that coast.
     for _ = 1, 11 do
         local x = rng:NextNumber(1080, 1360)
         local z = rng:NextNumber(-780, 360)
