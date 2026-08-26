@@ -22,12 +22,12 @@ local function buildDesertedIsland(config, folder)
     local terrain = workspace.Terrain
     local center = config.Locations.DesertedIsland or Vector3.new(-1260, 12, 690)
 
-    -- Layered terrain creates a real explorable southwest island rather than a
-    -- decorative sea rock. It is intentionally unreachable by normal trails.
-    terrain:FillBall(Vector3.new(center.X, -32, center.Z), 155, Enum.Material.Rock)
-    terrain:FillBall(Vector3.new(center.X, 0, center.Z), 137, Enum.Material.Sand)
-    terrain:FillBall(Vector3.new(center.X + 8, 17, center.Z - 8), 94, Enum.Material.Grass)
-    terrain:FillBall(Vector3.new(center.X - 42, 9, center.Z + 36), 58, Enum.Material.Sand)
+    -- Broad, low island profile: enough height for exploration without becoming
+    -- a giant sphere rising hundreds of studs from the ocean.
+    terrain:FillBall(Vector3.new(center.X, -110, center.Z), 155, Enum.Material.Rock)
+    terrain:FillBall(Vector3.new(center.X, -91, center.Z), 130, Enum.Material.Sand)
+    terrain:FillBall(Vector3.new(center.X + 8, -68, center.Z - 8), 94, Enum.Material.Grass)
+    terrain:FillBall(Vector3.new(center.X - 52, -72, center.Z + 42), 88, Enum.Material.Sand)
 
     local island = Instance.new("Model")
     island.Name = "DesertedIsland"
@@ -38,7 +38,6 @@ local function buildDesertedIsland(config, folder)
     local wood = Color3.fromRGB(86, 62, 38)
     local rock = Color3.fromRGB(88, 91, 86)
 
-    -- Broken jetty where the repaired raft arrives.
     for index = 0, 5 do
         local plank = makePart(
             island,
@@ -55,19 +54,18 @@ local function buildDesertedIsland(config, folder)
         makePart(island, "JettyPost", Vector3.new(1.3, 8, 1.3), CFrame.new(x, 2, center.Z + 12), Enum.Material.Wood, wood)
     end
 
-    -- Small abandoned stone shelter provides a visible objective from the raft.
-    makePart(island, "ShelterFloor", Vector3.new(24, 1, 18), CFrame.new(center.X - 15, 26, center.Z - 18), Enum.Material.Rock, rock)
+    makePart(island, "ShelterFloor", Vector3.new(24, 1, 18), CFrame.new(center.X - 15, 27, center.Z - 18), Enum.Material.Rock, rock)
     for _, offset in ipairs({
         Vector3.new(-10, 5, -7),
         Vector3.new(10, 5, -7),
         Vector3.new(-10, 5, 7),
         Vector3.new(10, 5, 7),
     }) do
-        makePart(island, "ShelterColumn", Vector3.new(2.5, 10, 2.5), CFrame.new(center.X - 15, 31, center.Z - 18) * CFrame.new(offset), Enum.Material.Rock, rock)
+        makePart(island, "ShelterColumn", Vector3.new(2.5, 10, 2.5), CFrame.new(center.X - 15, 32, center.Z - 18) * CFrame.new(offset), Enum.Material.Rock, rock)
     end
-    makePart(island, "CollapsedRoof", Vector3.new(19, 1.8, 8), CFrame.new(center.X - 15, 37, center.Z - 22) * CFrame.Angles(0.08, 0.25, 0.18), Enum.Material.Rock, rock)
+    makePart(island, "CollapsedRoof", Vector3.new(19, 1.8, 8), CFrame.new(center.X - 15, 38, center.Z - 22) * CFrame.Angles(0.08, 0.25, 0.18), Enum.Material.Rock, rock)
 
-    local marker = makePart(island, "DesertedIslandArrival", Vector3.new(8, 1, 8), CFrame.new(center.X + 105, 12, center.Z + 8), Enum.Material.SmoothPlastic, Color3.new(1, 1, 1))
+    local marker = makePart(island, "DesertedIslandArrival", Vector3.new(8, 1, 8), CFrame.new(center.X + 94, 24, center.Z + 8), Enum.Material.SmoothPlastic, Color3.new(1, 1, 1))
     marker.Transparency = 1
     marker.CanCollide = false
     marker.CanQuery = false
