@@ -3,10 +3,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WorldConfig"))
 local AtmosphereBuilder = require(script.Parent.AtmosphereBuilder)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
+local CaveBuilder = require(script.Parent.CaveBuilder)
 local CoastBuilder = require(script.Parent.CoastBuilder)
 local NaturalFeatureBuilder = require(script.Parent.NaturalFeatureBuilder)
 local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
+local ExplorationSiteBuilder = require(script.Parent.ExplorationSiteBuilder)
+local SignpostBuilder = require(script.Parent.SignpostBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
 local WorldAudit = require(script.Parent.WorldAudit)
 local WorldPreflight = require(script.Parent.WorldPreflight)
@@ -76,8 +79,6 @@ local function markBuildFailed(root, message)
 end
 
 function WorldBuilder.Build()
-    -- Validate all authoring configuration before clearing terrain, deleting the
-    -- Baseplate or moving players to the temporary generation platform.
     WorldPreflight.Assert(config)
 
     if buildInProgress then
@@ -108,6 +109,10 @@ function WorldBuilder.Build()
         root:SetAttribute("TerrainSampledCells", terrainState.SampledCells or 0)
         root:SetAttribute("TerrainFilledColumns", terrainState.FilledColumns or 0)
 
+        runPhase(root, "Caves", function()
+            CaveBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
+
         runPhase(root, "Coast", function()
             CoastBuilder.Build(config, root, TerrainBuilder.HeightAt)
         end)
@@ -116,14 +121,20 @@ function WorldBuilder.Build()
             NaturalFeatureBuilder.Build(config, root, TerrainBuilder.HeightAt)
         end)
 
-        -- Paths are laid before vegetation so tree placement can reserve walkable
-        -- corridors and we do not end up with trunks in the middle of the trail.
         runPhase(root, "Paths", function()
             PathBuilder.Build(config, root, TerrainBuilder.HeightAt)
         end)
 
         runPhase(root, "Landmarks", function()
             LandmarkBuilder.Build(config, root, terrainState, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "ExplorationSites", function()
+            ExplorationSiteBuilder.Build(config, root, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "TrailSigns", function()
+            SignpostBuilder.Build(config, root, TerrainBuilder.HeightAt)
         end)
 
         runPhase(root, "Vegetation", function()
