@@ -1,6 +1,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WorldConfig"))
+local shared = ReplicatedStorage:WaitForChild("Shared")
+local config = require(shared:WaitForChild("WorldConfig"))
+local gameplayConfig = require(shared:WaitForChild("GameplayConfig"))
 local AtmosphereBuilder = require(script.Parent.AtmosphereBuilder)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local CaveBuilder = require(script.Parent.CaveBuilder)
@@ -8,6 +10,7 @@ local CoastBuilder = require(script.Parent.CoastBuilder)
 local NaturalFeatureBuilder = require(script.Parent.NaturalFeatureBuilder)
 local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
+local RegionBuilder = require(script.Parent.RegionBuilder)
 local ExplorationSiteBuilder = require(script.Parent.ExplorationSiteBuilder)
 local SignpostBuilder = require(script.Parent.SignpostBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
@@ -129,6 +132,10 @@ function WorldBuilder.Build()
 
         runPhase(root, "Landmarks", function()
             LandmarkBuilder.Build(config, root, terrainState, TerrainBuilder.HeightAt)
+        end)
+
+        runPhase(root, "Regions", function()
+            RegionBuilder.Build(config, root, TerrainBuilder.HeightAt, gameplayConfig)
         end)
 
         runPhase(root, "Vegetation", function()
