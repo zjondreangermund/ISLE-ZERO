@@ -23,28 +23,62 @@ local function markDiscovery(model, id, displayName)
     model:SetAttribute("DiscoveryId", id)
     model:SetAttribute("DiscoveryName", displayName)
     model:SetAttribute("GeneratedPlaceholder", true)
+    model:SetAttribute("GuardianDefeated", false)
+    model:SetAttribute("CampBuilt", false)
     CollectionService:AddTag(model, "WorldCave")
     CollectionService:AddTag(model, "ExplorationSite")
 end
 
 local function worldNode(config, node, heightAt)
-    return Vector3.new(
-        node.X,
-        heightAt(config, node.X, node.Z) + node.Y,
-        node.Z
-    )
+    local surface = heightAt(config, node.X, node.Z)
+    local minimum = config.Island.BaseY + 18
+    return Vector3.new(node.X, math.max(minimum, surface + node.Y), node.Z)
 end
 
 local function carveSegment(terrain, a, b, radius)
     local length = (b - a).Magnitude
-    local samples = math.max(1, math.ceil(length / 7))
+    local samples = math.max(1, math.ceil(length / 5))
 
     for index = 0, samples do
         local alpha = index / samples
         local point = a:Lerp(b, alpha)
-        local variation = math.sin(alpha * math.pi) * 1.6
+        local variation = math.sin(alpha * math.pi) * 1.7 + math.sin(alpha * math.pi * 4) * 0.45
         terrain:FillBall(point, radius + variation, Enum.Material.Air)
     end
+end
+
+local function floorSegment(parent, a, b, width)
+    local delta = b - a
+    if delta.Magnitude < 1 then
+        return
+    end
+
+    local offset = Vector3.new(0, width * 0.58, 0)
+    local from = a - offset
+    local to = b - offset
+    local floor = makePart(
+        parent,
+        "CavePath",
+        Vector3.new(width * 1.45, 1.5, delta.Magnitude + 3),
+        CFrame.lookAt((from + to) / 2, to),
+        Enum.Material.Slate,
+        Color3.fromRGB(61, 65, 62)
+    )
+    floor.CanCollide = true
+end
+
+local function chamberFloor(parent, center, radius)
+    local floor = makePart(
+        parent,
+        "ChamberFloor",
+        Vector3.new(2.2, radius * 1.65, radius * 1.65),
+        CFrame.new(center - Vector3.new(0, radius * 0.7, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+        Enum.Material.Slate,
+        Color3.fromRGB(57, 61, 58)
+    )
+    floor.Shape = Enum.PartType.Cylinder
+    floor.CanCollide = true
+    return floor
 end
 
 local function createEntranceRocks(model, entrance, direction, radius)
@@ -58,229 +92,289 @@ local function createEntranceRocks(model, entrance, direction, radius)
     local rockColor = Color3.fromRGB(73, 77, 72)
 
     local offsets = {
-        right * (radius * 0.78) + Vector3.new(0, 2.5, 0),
-        -right * (radius * 0.78) + Vector3.new(0, 2.5, 0),
-        right * (radius * 0.62) + Vector3.new(0, radius * 0.65, 0),
-        -right * (radius * 0.62) + Vector3.new(0, radius * 0.65, 0),
-        right * (radius * 0.30) + Vector3.new(0, radius * 0.92, 0),
-        -right * (radius * 0.30) + Vector3.new(0, radius * 0.92, 0),
+        right * (radius * 0.95) + Vector3.new(0, 4, 0),
+        -right * (radius * 0.95) + Vector3.new(0, 5, 0),
+        right * (radius * 0.62) + Vector3.new(0, radius * 0.75, 0),
+        -right * (radius * 0.6) + Vector3.new(0, radius * 0.82, 0),
+        Vector3.new(0, radius * 1.05, 0),
     }
 
     for index, offset in ipairs(offsets) do
-        local size = Vector3.new(
-            5 + (index % 3) * 1.7,
-            6 + (index % 2) * 2.4,
-            5 + ((index + 1) % 3) * 1.5
-        )
         local rock = makePart(
             model,
             "EntranceRock",
-            size,
-            CFrame.new(entrance + offset)
-                * CFrame.Angles(index * 0.13, index * 0.41, index * 0.09),
+            Vector3.new(radius * 0.8, radius * (0.75 + (index % 3) * 0.14), radius * 0.7),
+            CFrame.new(entrance + offset) * CFrame.Angles(index * 0.17, index * 0.72, index * 0.12),
             Enum.Material.Rock,
             rockColor
         )
         rock.CanCollide = true
-        rock.CanQuery = true
     end
 end
 
-local function createCrate(parent, position, rotation)
-    local crate = makePart(
+local function createPickup(parent, caveId, itemId, amount, position)
+    local colors = {
+        Stone = Color3.fromRGB(103, 108, 103),
+        Rope = Color3.fromRGB(143, 111, 67),
+        Cloth = Color3.fromRGB(152, 150, 124),
+        Herb = Color3.fromRGB(68, 126, 61),
+        Wood = Color3.fromRGB(111, 77, 44),
+    }
+    local pickup = makePart(
         parent,
-        "OldCrate",
-        Vector3.new(6, 5, 6),
-        CFrame.new(position) * CFrame.Angles(0, rotation, 0),
-        Enum.Material.WoodPlanks,
-        Color3.fromRGB(93, 70, 43)
-    )
-    crate.CanCollide = true
-    return crate
-end
-
-local function createBarrel(parent, position, rotation)
-    local barrel = makePart(
-        parent,
-        "RustBarrel",
-        Vector3.new(5.5, 4.4, 4.4),
-        CFrame.new(position) * CFrame.Angles(0, rotation, math.rad(90)),
-        Enum.Material.CorrodedMetal,
-        Color3.fromRGB(77, 76, 68)
-    )
-    barrel.Shape = Enum.PartType.Cylinder
-    barrel.CanCollide = true
-    return barrel
-end
-
-local function createLantern(parent, position, lit)
-    local base = makePart(
-        parent,
-        "LanternBase",
-        Vector3.new(1.7, 0.5, 1.7),
+        "Pickup_" .. itemId,
+        Vector3.new(2.5, 2.5, 2.5),
         CFrame.new(position),
-        Enum.Material.Metal,
-        Color3.fromRGB(65, 67, 62)
+        itemId == "Herb" and Enum.Material.Grass or Enum.Material.SmoothPlastic,
+        colors[itemId] or Color3.fromRGB(125, 125, 120)
     )
-    base.CanCollide = false
+    pickup.Shape = itemId == "Stone" and Enum.PartType.Ball or Enum.PartType.Block
+    pickup.CanCollide = false
+    pickup:SetAttribute("ItemId", itemId)
+    pickup:SetAttribute("Amount", amount)
+    pickup:SetAttribute("CaveId", caveId)
+    CollectionService:AddTag(pickup, "WorldPickup")
 
-    local glass = makePart(
-        parent,
-        "LanternGlow",
-        Vector3.new(1.1, 1.8, 1.1),
-        CFrame.new(position + Vector3.new(0, 1.1, 0)),
-        lit and Enum.Material.Neon or Enum.Material.Glass,
-        lit and Color3.fromRGB(222, 179, 98) or Color3.fromRGB(104, 110, 105),
-        lit and 0.25 or 0.55
-    )
-    glass.CanCollide = false
-    glass.CanQuery = false
-
-    if lit then
-        local light = Instance.new("PointLight")
-        light.Name = "CaveLanternLight"
-        light.Brightness = 1.2
-        light.Range = 18
-        light.Shadows = true
-        light.Color = Color3.fromRGB(255, 205, 128)
-        light.Parent = glass
-    end
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = "PickupPrompt"
+    prompt.ActionText = "Pick up"
+    prompt.ObjectText = itemId
+    prompt.HoldDuration = 0.15
+    prompt.MaxActivationDistance = 10
+    prompt.RequiresLineOfSight = false
+    prompt.Parent = pickup
 end
 
-local function decorateSmuggler(model, floorPosition)
-    createCrate(model, floorPosition + Vector3.new(-7, 1.9, -4), 0.28)
-    createCrate(model, floorPosition + Vector3.new(-1, 1.9, -8), -0.16)
-    createCrate(model, floorPosition + Vector3.new(6, 1.9, -5), 0.52)
-    createBarrel(model, floorPosition + Vector3.new(8, 2.2, 4), 0.2)
-    createBarrel(model, floorPosition + Vector3.new(4, 2.2, 8), -0.4)
-    createLantern(model, floorPosition + Vector3.new(-3, 0.4, 5), true)
+local function createChest(parent, caveId, routeName, tier, position, yaw)
+    local model = Instance.new("Model")
+    model.Name = "Chest_" .. routeName
+    model.Parent = parent
+    model:SetAttribute("GeneratedPlaceholder", true)
 
-    local plank = makePart(
+    local body = makePart(
         model,
-        "BrokenPlank",
-        Vector3.new(15, 0.7, 2.2),
-        CFrame.new(floorPosition + Vector3.new(0, 0.8, 2)) * CFrame.Angles(0, 0.44, 0.05),
+        "ChestBody",
+        Vector3.new(7.5, 4.2, 5.2),
+        CFrame.new(position) * CFrame.Angles(0, yaw, 0),
         Enum.Material.WoodPlanks,
-        Color3.fromRGB(81, 60, 38)
+        Color3.fromRGB(91, 63, 37)
     )
-    plank.CanCollide = false
-end
+    body:SetAttribute("ChestId", caveId .. "_" .. routeName)
+    body:SetAttribute("CaveId", caveId)
+    body:SetAttribute("LootTier", tier)
+    CollectionService:AddTag(body, "LootChest")
 
-local function decorateExpedition(model, floorPosition)
-    createCrate(model, floorPosition + Vector3.new(-6, 1.9, 3), 0.22)
-    createLantern(model, floorPosition + Vector3.new(3, 0.4, 3), false)
-
-    local bedroll = makePart(
-        model,
-        "AbandonedBedroll",
-        Vector3.new(7, 0.6, 3),
-        CFrame.new(floorPosition + Vector3.new(5, 0.7, -4)) * CFrame.Angles(0, -0.3, 0),
-        Enum.Material.Fabric,
-        Color3.fromRGB(77, 88, 69)
-    )
-    bedroll.CanCollide = false
-
-    for index = 1, 5 do
-        local bone = makePart(
-            model,
-            "ExpeditionBone",
-            Vector3.new(0.55, 0.55, 2.8 + index * 0.22),
-            CFrame.new(floorPosition + Vector3.new(-1 + index * 0.8, 0.8, -5 + (index % 2)))
-                * CFrame.Angles(index * 0.2, index * 0.7, index * 0.12),
-            Enum.Material.SmoothPlastic,
-            Color3.fromRGB(188, 181, 158)
-        )
-        bone.CanCollide = false
-        bone.CanQuery = false
-    end
-end
-
-local function decorateTemple(model, floorPosition)
-    local stone = Color3.fromRGB(105, 104, 94)
     makePart(
         model,
-        "UndercroftAltar",
-        Vector3.new(12, 3.2, 7),
-        CFrame.new(floorPosition + Vector3.new(0, 1.7, -7)),
-        Enum.Material.Limestone,
-        stone
+        "ChestLid",
+        Vector3.new(7.7, 1.4, 5.4),
+        CFrame.new(position + Vector3.new(0, 2.7, 0)) * CFrame.Angles(0, yaw, 0),
+        Enum.Material.WoodPlanks,
+        Color3.fromRGB(108, 74, 41)
     )
-    for _, x in ipairs({-9, 9}) do
+    for _, x in ipairs({-2.6, 2.6}) do
         makePart(
             model,
-            "BuriedColumn",
-            Vector3.new(3.5, 11, 3.5),
-            CFrame.new(floorPosition + Vector3.new(x, 5.5, 2)),
-            Enum.Material.Limestone,
-            stone
-        )
+            "MetalBand",
+            Vector3.new(0.5, 5.5, 5.5),
+            CFrame.new(position + Vector3.new(x, 1.25, 0)) * CFrame.Angles(0, yaw, 0),
+            Enum.Material.CorrodedMetal,
+            Color3.fromRGB(68, 70, 66)
+        ).CanCollide = false
     end
-    for index = 1, 6 do
-        local rubble = makePart(
-            model,
-            "TempleRubble",
-            Vector3.new(3 + index % 3, 1.4 + index % 2, 3.5),
-            CFrame.new(floorPosition + Vector3.new(-10 + index * 3.2, 0.9, 7 - (index % 2) * 4))
-                * CFrame.Angles(0.1 * index, 0.48 * index, 0.08 * index),
-            Enum.Material.Limestone,
-            stone
-        )
-        rubble.CanCollide = false
+
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = "OpenChestPrompt"
+    prompt.ActionText = "Open"
+    prompt.ObjectText = routeName .. " cache"
+    prompt.HoldDuration = 0.5
+    prompt.MaxActivationDistance = 10
+    prompt.RequiresLineOfSight = false
+    prompt.Enabled = false
+    prompt.Parent = body
+end
+
+local function signText(board, text)
+    local gui = Instance.new("SurfaceGui")
+    gui.Name = "CaveRouteLabel"
+    gui.Face = Enum.NormalId.Front
+    gui.AlwaysOnTop = false
+    gui.Parent = board
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Text = text
+    label.TextScaled = true
+    label.TextWrapped = true
+    label.TextColor3 = Color3.fromRGB(226, 210, 170)
+    label.TextStrokeTransparency = 0.55
+    label.Font = Enum.Font.GothamBold
+    label.Parent = gui
+end
+
+local function createRouteSign(parent, position, lookAt, text)
+    local horizontalTarget = Vector3.new(lookAt.X, position.Y, lookAt.Z)
+    local board = makePart(
+        parent,
+        "RouteSign",
+        Vector3.new(8, 3, 0.55),
+        CFrame.lookAt(position, horizontalTarget),
+        Enum.Material.WoodPlanks,
+        Color3.fromRGB(83, 58, 35)
+    )
+    board.CanCollide = false
+    signText(board, text)
+end
+
+local function createGuardianMarker(parent, caveId, guardianType, position)
+    local marker = makePart(
+        parent,
+        "GuardianSpawn",
+        Vector3.new(4, 1, 4),
+        CFrame.new(position),
+        Enum.Material.SmoothPlastic,
+        Color3.fromRGB(255, 255, 255),
+        1
+    )
+    marker.CanCollide = false
+    marker.CanQuery = false
+    marker:SetAttribute("CaveId", caveId)
+    marker:SetAttribute("GuardianType", guardianType)
+    CollectionService:AddTag(marker, "CaveGuardianSpawn")
+end
+
+local function createCampSpot(parent, caveId, position)
+    local pad = makePart(
+        parent,
+        "CampBuildSpot",
+        Vector3.new(13, 0.8, 11),
+        CFrame.new(position),
+        Enum.Material.Slate,
+        Color3.fromRGB(72, 78, 69),
+        0.18
+    )
+    pad.CanCollide = true
+    pad:SetAttribute("CaveId", caveId)
+    CollectionService:AddTag(pad, "CampBuildSpot")
+
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = "CampPrompt"
+    prompt.ActionText = "Build safe tent"
+    prompt.ObjectText = "Clear the cave first"
+    prompt.HoldDuration = 0.75
+    prompt.MaxActivationDistance = 11
+    prompt.RequiresLineOfSight = false
+    prompt.Enabled = false
+    prompt.Parent = pad
+end
+
+local function createGuideLight(parent, position, index)
+    local crystal = makePart(
+        parent,
+        "CaveGlow",
+        Vector3.new(1.1, 2.4 + index % 2, 1.1),
+        CFrame.new(position),
+        Enum.Material.Neon,
+        Color3.fromRGB(76, 139, 144),
+        0.12
+    )
+    crystal.CanCollide = false
+    crystal.CanQuery = false
+    local light = Instance.new("PointLight")
+    light.Brightness = 0.75
+    light.Range = 16
+    light.Color = Color3.fromRGB(95, 168, 169)
+    light.Parent = crystal
+end
+
+local function createProps(model, cave, chamber, floorY)
+    if cave.Props == "Expedition" then
+        makePart(model, "BrokenCrate", Vector3.new(6, 4, 6), CFrame.new(chamber + Vector3.new(10, floorY - chamber.Y + 2, 4)) * CFrame.Angles(0.2, 0.4, 0.1), Enum.Material.WoodPlanks, Color3.fromRGB(88, 64, 39))
+        local journal = makePart(model, "OldJournal", Vector3.new(2.4, 0.35, 3), CFrame.new(chamber + Vector3.new(5, floorY - chamber.Y + 1, -8)), Enum.Material.Fabric, Color3.fromRGB(83, 59, 40))
+        journal.CanCollide = false
+    elseif cave.Props == "Smuggler" then
+        for index = 1, 3 do
+            local barrel = makePart(model, "SmugglerBarrel", Vector3.new(5.5, 4.2, 4.2), CFrame.new(chamber + Vector3.new(index * 5 - 9, floorY - chamber.Y + 2.2, 10)) * CFrame.Angles(0, index * 0.5, math.rad(90)), Enum.Material.CorrodedMetal, Color3.fromRGB(76, 77, 67))
+            barrel.Shape = Enum.PartType.Cylinder
+        end
+    elseif cave.Props == "Temple" then
+        for _, x in ipairs({-10, 10}) do
+            makePart(model, "UndercroftColumn", Vector3.new(4, 15, 4), CFrame.new(chamber + Vector3.new(x, floorY - chamber.Y + 7.5, 8)), Enum.Material.Limestone, Color3.fromRGB(103, 102, 91))
+        end
+        makePart(model, "UndercroftAltar", Vector3.new(9, 4, 6), CFrame.new(chamber + Vector3.new(0, floorY - chamber.Y + 2, 12)), Enum.Material.Limestone, Color3.fromRGB(105, 103, 91))
+    elseif cave.Props == "Bunker" then
+        makePart(model, "ServiceFrame", Vector3.new(18, 2, 2), CFrame.new(chamber + Vector3.new(0, floorY - chamber.Y + 10, 8)), Enum.Material.Metal, Color3.fromRGB(68, 72, 69))
+        for _, x in ipairs({-8, 8}) do
+            makePart(model, "ServicePost", Vector3.new(2, 18, 2), CFrame.new(chamber + Vector3.new(x, floorY - chamber.Y + 9, 8)), Enum.Material.Metal, Color3.fromRGB(68, 72, 69))
+        end
+    else
+        for index = 1, 5 do
+            local rock = makePart(model, "DeepCaveRock", Vector3.new(4 + index, 3 + index % 2, 5), CFrame.new(chamber + Vector3.new(-14 + index * 6, floorY - chamber.Y + 1.5, 10 + (index % 2) * 4)) * CFrame.Angles(index * 0.1, index * 0.7, 0), Enum.Material.Rock, Color3.fromRGB(70, 74, 71))
+            rock.CanCollide = false
+        end
     end
 end
 
-local function decorateBunker(model, floorPosition)
-    local concrete = Color3.fromRGB(91, 96, 91)
-    makePart(
-        model,
-        "ServiceWallLeft",
-        Vector3.new(3, 13, 12),
-        CFrame.new(floorPosition + Vector3.new(-7, 6.5, -5)),
-        Enum.Material.Concrete,
-        concrete
-    )
-    makePart(
-        model,
-        "ServiceWallRight",
-        Vector3.new(3, 13, 12),
-        CFrame.new(floorPosition + Vector3.new(7, 6.5, -5)),
-        Enum.Material.Concrete,
-        concrete
-    )
-    local door = makePart(
-        model,
-        "InnerServiceDoor",
-        Vector3.new(11, 11, 1.8),
-        CFrame.new(floorPosition + Vector3.new(0, 5.5, -10.5)),
-        Enum.Material.DiamondPlate,
-        Color3.fromRGB(57, 65, 62)
-    )
-    door:SetAttribute("InteractableFuture", "BunkerServiceDoor")
-    createLantern(model, floorPosition + Vector3.new(-4, 0.4, 4), true)
-end
+local function buildBranches(terrain, model, caveId, chamber, previous, radius)
+    local horizontal = Vector3.new(chamber.X - previous.X, 0, chamber.Z - previous.Z)
+    if horizontal.Magnitude < 0.1 then
+        horizontal = Vector3.new(0, 0, -1)
+    else
+        horizontal = horizontal.Unit
+    end
+    local right = Vector3.new(-horizontal.Z, 0, horizontal.X)
 
-local function decorateNatural(model, floorPosition)
-    for index = 1, 8 do
-        local angle = index / 8 * math.pi * 2
-        local distance = 7 + (index % 3) * 3
-        local rock = makePart(
-            model,
-            "CaveBoulder",
-            Vector3.new(3 + index % 4, 2 + index % 3, 4 + ((index + 1) % 4)),
-            CFrame.new(floorPosition + Vector3.new(math.cos(angle) * distance, 1.2, math.sin(angle) * distance))
-                * CFrame.Angles(index * 0.16, index * 0.51, index * 0.1),
-            Enum.Material.Rock,
-            Color3.fromRGB(67, 72, 69)
-        )
-        rock.CanCollide = false
+    local branches = {
+        {
+            Name = "SUPPLIES",
+            Tier = "Supplies",
+            Mid = chamber + right * 28 + horizontal * 20 + Vector3.new(0, -3, 0),
+            Target = chamber + right * 62 + horizontal * 42 + Vector3.new(0, -5, 0),
+        },
+        {
+            Name = "RELIC",
+            Tier = "Relic",
+            Mid = chamber - right * 30 + horizontal * 18 + Vector3.new(0, -4, 0),
+            Target = chamber - right * 66 + horizontal * 40 + Vector3.new(0, -8, 0),
+        },
+        {
+            Name = "DEEP CACHE",
+            Tier = "Deep",
+            Mid = chamber + horizontal * 46 + Vector3.new(0, -6, 0),
+            Target = chamber + horizontal * 92 + right * 7 + Vector3.new(0, -12, 0),
+        },
+    }
+
+    for index, branch in ipairs(branches) do
+        carveSegment(terrain, chamber, branch.Mid, radius * 0.82)
+        carveSegment(terrain, branch.Mid, branch.Target, radius * 0.86)
+        terrain:FillBall(branch.Target, radius * 1.15, Enum.Material.Air)
+        floorSegment(model, chamber, branch.Mid, radius * 0.8)
+        floorSegment(model, branch.Mid, branch.Target, radius * 0.8)
+        chamberFloor(model, branch.Target, radius * 0.85)
+
+        local chestY = branch.Target.Y - radius * 0.58 + 2.2
+        createChest(model, caveId, branch.Name, branch.Tier, Vector3.new(branch.Target.X, chestY, branch.Target.Z), index * 0.65)
+
+        local signPosition = chamber + horizontal * 8 + (index == 1 and right * 6 or index == 2 and -right * 6 or Vector3.zero) + Vector3.new(0, -radius * 0.48 + 5, 0)
+        createRouteSign(model, signPosition, branch.Target, branch.Name)
+
+        if index == 1 then
+            createPickup(model, caveId, "Rope", 1, branch.Mid - Vector3.new(0, radius * 0.5, 0))
+        elseif index == 2 then
+            createPickup(model, caveId, "Herb", 1, branch.Mid - Vector3.new(0, radius * 0.5, 0))
+        else
+            createPickup(model, caveId, "Stone", 2, branch.Mid - Vector3.new(0, radius * 0.5, 0))
+        end
     end
 end
 
-local function buildOneCave(config, root, caveId, cave, heightAt)
+local function buildOne(config, folder, caveId, cave, heightAt)
     local terrain = workspace.Terrain
     local model = Instance.new("Model")
     model.Name = caveId
-    model.Parent = root
+    model.Parent = folder
     markDiscovery(model, caveId, cave.DiscoveryName or caveId)
 
     local nodes = {}
@@ -292,83 +386,61 @@ local function buildOneCave(config, root, caveId, cave, heightAt)
         return model
     end
 
-    local radius = cave.TunnelRadius or 12
-    terrain:FillBall(nodes[1], radius * 1.12, Enum.Material.Air)
-
+    local radius = cave.TunnelRadius or 13
     for index = 1, #nodes - 1 do
         carveSegment(terrain, nodes[index], nodes[index + 1], radius)
+        floorSegment(model, nodes[index], nodes[index + 1], radius)
+        if index % 2 == 0 then
+            local glowPosition = nodes[index]:Lerp(nodes[index + 1], 0.45) - Vector3.new(0, radius * 0.4, 0)
+            createGuideLight(model, glowPosition, index)
+        end
     end
 
-    local chamberRadius = cave.ChamberRadius or radius * 1.8
+    local entrance = nodes[1]
+    local entranceDirection = nodes[2] - nodes[1]
+    terrain:FillBall(entrance, radius * 1.15, Enum.Material.Air)
+    createEntranceRocks(model, entrance, entranceDirection, radius)
+
     local chamber = nodes[#nodes]
+    local chamberRadius = cave.ChamberRadius or radius * 2
     terrain:FillBall(chamber, chamberRadius, Enum.Material.Air)
-    terrain:FillBall(chamber + Vector3.new(chamberRadius * 0.34, 2, 0), chamberRadius * 0.64, Enum.Material.Air)
+    chamberFloor(model, chamber, chamberRadius)
 
-    local floorPosition = chamber - Vector3.new(0, chamberRadius * 0.47, 0)
-    local floor = makePart(
-        model,
-        "CaveFloor",
-        Vector3.new(chamberRadius * 1.55, 1.2, chamberRadius * 1.45),
-        CFrame.new(floorPosition),
-        Enum.Material.Slate,
-        Color3.fromRGB(61, 66, 64)
-    )
-    floor.CanCollide = true
+    local chamberFloorY = chamber.Y - chamberRadius * 0.68
+    createProps(model, cave, chamber, chamberFloorY)
+    buildBranches(terrain, model, caveId, chamber, nodes[#nodes - 1], radius)
 
-    local direction = nodes[2] - nodes[1]
-    createEntranceRocks(model, nodes[1], direction, radius)
+    local guardianPosition = Vector3.new(chamber.X, chamberFloorY + 4, chamber.Z - 4)
+    createGuardianMarker(model, caveId, cave.Guardian or "CaveBoar", guardianPosition)
+    createCampSpot(model, caveId, Vector3.new(chamber.X + 12, chamberFloorY + 0.6, chamber.Z + 12))
 
-    local marker = makePart(
-        model,
-        "DiscoveryMarker",
-        Vector3.new(5, 7, 5),
-        CFrame.new(nodes[1]),
-        Enum.Material.SmoothPlastic,
-        Color3.fromRGB(255, 255, 255),
-        1
-    )
-    marker.CanCollide = false
-    marker.CanQuery = false
-    marker:SetAttribute("DiscoveryId", caveId)
-    marker:SetAttribute("DiscoveryName", cave.DiscoveryName or caveId)
-
-    local props = cave.Props or "Natural"
-    if props == "Smuggler" then
-        decorateSmuggler(model, floorPosition)
-    elseif props == "Expedition" then
-        decorateExpedition(model, floorPosition)
-    elseif props == "Temple" then
-        decorateTemple(model, floorPosition)
-    elseif props == "Bunker" then
-        decorateBunker(model, floorPosition)
-    else
-        decorateNatural(model, floorPosition)
+    if #nodes >= 4 then
+        createPickup(model, caveId, "Stone", 2, nodes[3] - Vector3.new(0, radius * 0.48, 0))
+        createPickup(model, caveId, "Cloth", 1, nodes[4] - Vector3.new(0, radius * 0.48, 0))
     end
 
-    model:SetAttribute("EntranceX", nodes[1].X)
-    model:SetAttribute("EntranceY", nodes[1].Y)
-    model:SetAttribute("EntranceZ", nodes[1].Z)
-    model:SetAttribute("ChamberX", chamber.X)
-    model:SetAttribute("ChamberY", chamber.Y)
-    model:SetAttribute("ChamberZ", chamber.Z)
+    model:SetAttribute("TunnelNodeCount", #nodes)
+    model:SetAttribute("BranchCount", 3)
+    model:SetAttribute("GuardianType", cave.Guardian or "CaveBoar")
+    model:SetAttribute("MainChamberX", chamber.X)
+    model:SetAttribute("MainChamberY", chamber.Y)
+    model:SetAttribute("MainChamberZ", chamber.Z)
     return model
 end
 
-function CaveBuilder.Build(config, worldRoot, heightAt)
+function CaveBuilder.Build(config, root, heightAt)
     local folder = Instance.new("Folder")
     folder.Name = "Caves"
-    folder.Parent = worldRoot
+    folder.Parent = root
 
-    local caveCount = 0
-    local caves = (config.Exploration and config.Exploration.Caves) or {}
-    for caveId, cave in pairs(caves) do
-        buildOneCave(config, folder, caveId, cave, heightAt)
-        caveCount += 1
-        task.wait()
+    local count = 0
+    for caveId, cave in pairs((config.Exploration and config.Exploration.Caves) or {}) do
+        buildOne(config, folder, caveId, cave, heightAt)
+        count += 1
     end
 
-    folder:SetAttribute("CaveCount", caveCount)
-    print(string.format("[ISLE//ZERO][CAVES] Built %d exploration caves", caveCount))
+    folder:SetAttribute("CaveCount", count)
+    print(string.format("[ISLE//ZERO][CAVES] Built %d deep branching cave dungeons", count))
     return folder
 end
 
