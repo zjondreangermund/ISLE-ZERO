@@ -27,11 +27,29 @@ function PathBuilder.DistanceToAnyPath(config, point)
     return best
 end
 
+local function distanceToRiver(config, point)
+    local waterways = config.Waterways
+    if not waterways or not waterways.MainRiver then
+        return math.huge
+    end
+
+    local best = math.huge
+    local river = waterways.MainRiver
+    for i = 1, #river - 1 do
+        best = math.min(best, horizontalDistanceToSegment(point, river[i], river[i + 1]))
+    end
+    return best
+end
+
 local function createTrailPiece(parent, a, b, width, material, color)
-    local delta = b - a
-    if delta.Magnitude < 1 then
+    local horizontalDelta = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+    local length = horizontalDelta.Magnitude
+    if length < 0.75 then
         return
     end
+
+    local midpoint = Vector3.new((a.X + b.X) / 2, (a.Y + b.Y) / 2, (a.Z + b.Z) / 2)
+    local target = midpoint + horizontalDelta
 
     local piece = Instance.new("Part")
     piece.Name = "Trail"
@@ -42,15 +60,18 @@ local function createTrailPiece(parent, a, b, width, material, color)
     piece.CastShadow = false
     piece.Material = material
     piece.Color = color
-    piece.Size = Vector3.new(width, 0.45, delta.Magnitude + 1)
-    piece.CFrame = CFrame.lookAt((a + b) / 2, b)
+    piece.Transparency = 0.08
+    piece.Size = Vector3.new(width, 0.24, length + 1.4)
+    piece.CFrame = CFrame.lookAt(midpoint, target)
     piece.Parent = parent
     piece:SetAttribute("GeneratedPlaceholder", true)
     CollectionService:AddTag(piece, "WorldPath")
 end
 
 local function buildPath(config, parent, points, width, heightAt, color)
-    local sampleSpacing = 18
+    local sampleSpacing = 9
+    local riverClearance = (((config.Waterways or {}).RiverWidth) or 24) * 0.72
+
     for i = 1, #points - 1 do
         local from = points[i]
         local to = points[i + 1]
@@ -62,10 +83,14 @@ local function buildPath(config, parent, points, width, heightAt, color)
             local t = sample / samples
             local x = from.X + (to.X - from.X) * t
             local z = from.Z + (to.Z - from.Z) * t
-            local y = heightAt(config, x, z) + 0.35
+            local y = heightAt(config, x, z) + 0.28
             local current = Vector3.new(x, y, z)
+
             if previous then
-                createTrailPiece(parent, previous, current, width, Enum.Material.Ground, color)
+                local midpoint = (previous + current) / 2
+                if distanceToRiver(config, midpoint) > riverClearance then
+                    createTrailPiece(parent, previous, current, width, Enum.Material.Ground, color)
+                end
             end
             previous = current
         end
@@ -80,17 +105,17 @@ function PathBuilder.Build(config, root, heightAt)
     local main = Instance.new("Folder")
     main.Name = "MainTrail"
     main.Parent = folder
-    buildPath(config, main, config.Paths.Main, 12, heightAt, Color3.fromRGB(96, 82, 58))
+    buildPath(config, main, config.Paths.Main, 10, heightAt, Color3.fromRGB(91, 78, 57))
 
     local east = Instance.new("Folder")
     east.Name = "EastCliffLoop"
     east.Parent = folder
-    buildPath(config, east, config.Paths.EastLoop, 9, heightAt, Color3.fromRGB(89, 78, 60))
+    buildPath(config, east, config.Paths.EastLoop, 7.5, heightAt, Color3.fromRGB(85, 75, 58))
 
     local west = Instance.new("Folder")
     west.Name = "MangroveLoop"
     west.Parent = folder
-    buildPath(config, west, config.Paths.WestLoop, 8, heightAt, Color3.fromRGB(82, 72, 54))
+    buildPath(config, west, config.Paths.WestLoop, 7, heightAt, Color3.fromRGB(78, 70, 54))
 
     return folder
 end
