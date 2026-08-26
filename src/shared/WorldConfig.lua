@@ -1,5 +1,5 @@
 local WorldConfig = {
-    WorldVersion = 2,
+    WorldVersion = 3,
     Seed = 7102026,
 
     SeaLevel = 0,
@@ -20,10 +20,29 @@ local WorldConfig = {
         VegetationDensity = 1.0,
     },
 
+    Vegetation = {
+        -- Targets are deliberately high enough to read as a real island forest
+        -- from both ground level and aerial views. The builder still respects
+        -- trails, landmarks, beaches, steep/high terrain and minimum spacing.
+        JungleTreeTarget = 2800,
+        PalmTarget = 420,
+        MangroveTarget = 300,
+        UnderstoryTarget = 1400,
+        RockTarget = 260,
+        MaxAttemptsMultiplier = 7,
+        TreeSpacing = 8.5,
+        PalmSpacing = 10,
+        MangroveSpacing = 7.5,
+        PathClearance = 9,
+        ForestNoiseScale = 185,
+        ForestNoiseBias = -0.34,
+        MaxTreeElevation = 235,
+    },
+
     Audit = {
         WarnPathGrade = 0.65,
-        WarnGeneratedDescendants = 3500,
-        MaxGeneratedDescendants = 5000,
+        WarnGeneratedDescendants = 14000,
+        MaxGeneratedDescendants = 22000,
     },
 
     Locations = {
