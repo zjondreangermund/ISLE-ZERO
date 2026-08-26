@@ -45,7 +45,7 @@ function CoastBuilder.Build(config, root, heightAt)
 
     -- Driftwood and storm debris help the spawn beach feel authored before
     -- custom meshes are available.
-    for i = 1, 18 do
+    for _ = 1, 18 do
         local x = crash.X + rng:NextNumber(-320, 320)
         local z = crash.Z + rng:NextNumber(-110, 140)
         local y = heightAt(config, x, z)
@@ -66,7 +66,7 @@ function CoastBuilder.Build(config, root, heightAt)
 
     -- Extra sea stacks along the east coast break up the horizon and reinforce
     -- the rougher cliff-side identity of that coast.
-    for i = 1, 11 do
+    for _ = 1, 11 do
         local x = rng:NextNumber(1080, 1360)
         local z = rng:NextNumber(-780, 360)
         local size = Vector3.new(rng:NextNumber(14, 35), rng:NextNumber(20, 65), rng:NextNumber(14, 34))
