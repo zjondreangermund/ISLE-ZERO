@@ -115,6 +115,63 @@ local function auditSpawnClearance(landmarks, spawn, report)
     end
 end
 
+local function auditVegetation(config, root, report)
+    local vegetation = root:FindFirstChild("Vegetation")
+    if not vegetation then
+        return
+    end
+
+    local jungle = vegetation:GetAttribute("JungleTrees") or 0
+    local emergent = vegetation:GetAttribute("EmergentTrees") or 0
+    local palms = vegetation:GetAttribute("Palms") or 0
+    local mangroves = vegetation:GetAttribute("Mangroves") or 0
+    local understory = vegetation:GetAttribute("Understory") or 0
+    local rocks = vegetation:GetAttribute("Rocks") or 0
+    local totalTrees = vegetation:GetAttribute("TotalTrees") or (jungle + palms + mangroves)
+
+    report.metrics.TotalTrees = totalTrees
+    report.metrics.JungleTrees = jungle
+    report.metrics.EmergentTrees = emergent
+    report.metrics.Palms = palms
+    report.metrics.Mangroves = mangroves
+    report.metrics.Understory = understory
+    report.metrics.Rocks = rocks
+
+    local minimumTrees = (config.Audit and config.Audit.MinTreeCount) or 2500
+    if totalTrees < minimumTrees then
+        record(
+            report,
+            "warnings",
+            string.format("Forest is below density target: %d trees generated, expected at least %d", totalTrees, minimumTrees)
+        )
+    end
+
+    if jungle < 1200 then
+        record(report, "warnings", string.format("Jungle canopy is sparse: only %d jungle trees generated", jungle))
+    end
+    if palms < 140 then
+        record(report, "warnings", string.format("Coastal palm population is sparse: only %d palms generated", palms))
+    end
+    if mangroves < 100 then
+        record(report, "warnings", string.format("Mangrove belt is sparse: only %d mangroves generated", mangroves))
+    end
+
+    record(
+        report,
+        "info",
+        string.format(
+            "Vegetation: %d total trees (%d jungle incl. %d emergent, %d palms, %d mangroves), %d understory, %d rocks",
+            totalTrees,
+            jungle,
+            emergent,
+            palms,
+            mangroves,
+            understory,
+            rocks
+        )
+    )
+end
+
 function WorldAudit.Run(config, root, heightAt)
     local report = {
         errors = {},
@@ -168,6 +225,7 @@ function WorldAudit.Run(config, root, heightAt)
     end
 
     auditPathGrades(config, heightAt, report)
+    auditVegetation(config, root, report)
 
     local landmarkPositions = {}
     for name, position in pairs(config.Locations) do
@@ -205,8 +263,8 @@ function WorldAudit.Run(config, root, heightAt)
     local descendantCount = #root:GetDescendants()
     report.metrics.GeneratedDescendants = descendantCount
 
-    local warnBudget = (config.Audit and config.Audit.WarnGeneratedDescendants) or 3500
-    local maxBudget = (config.Audit and config.Audit.MaxGeneratedDescendants) or 5000
+    local warnBudget = (config.Audit and config.Audit.WarnGeneratedDescendants) or 14000
+    local maxBudget = (config.Audit and config.Audit.MaxGeneratedDescendants) or 22000
     if descendantCount > maxBudget then
         record(report, "warnings", string.format("Generated descendants %d exceed the preferred maximum budget of %d", descendantCount, maxBudget))
     elseif descendantCount > warnBudget then
@@ -222,6 +280,10 @@ function WorldAudit.Run(config, root, heightAt)
     root:SetAttribute("AuditWarnings", #report.warnings)
     root:SetAttribute("GeneratedDescendants", descendantCount)
     root:SetAttribute("WorstPathGrade", report.metrics.WorstPathGrade)
+    root:SetAttribute("TotalTrees", report.metrics.TotalTrees or 0)
+    root:SetAttribute("JungleTrees", report.metrics.JungleTrees or 0)
+    root:SetAttribute("Palms", report.metrics.Palms or 0)
+    root:SetAttribute("Mangroves", report.metrics.Mangroves or 0)
 
     for _, message in ipairs(report.errors) do
         warn("[ISLE//ZERO][WORLD AUDIT][ERROR] " .. message)
