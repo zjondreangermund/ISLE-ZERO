@@ -129,14 +129,42 @@ local function buildRuins(parent, config, heightAt)
     markLandmark(model, "ridge_ruins")
 
     local stone = Color3.fromRGB(116, 113, 101)
-    for i = -2, 2 do
-        local x = center.X + i * 18
-        local h = 16 + ((i + 2) % 3) * 7
-        part(model, "BrokenColumn", Vector3.new(5, h, 5), CFrame.new(x, y + h / 2, center.Z), Enum.Material.Limestone, stone)
+    local darkStone = Color3.fromRGB(99, 99, 91)
+    local base = CFrame.new(center.X, y, center.Z) * CFrame.Angles(0, math.rad(-8), 0)
+
+    part(model, "TempleFloor", Vector3.new(86, 2.4, 58), base * CFrame.new(0, 1.2, 0), Enum.Material.Limestone, darkStone)
+    part(model, "InnerPlatform", Vector3.new(48, 2, 30), base * CFrame.new(0, 3.1, -4), Enum.Material.Limestone, stone)
+    part(model, "Altar", Vector3.new(12, 5, 8), base * CFrame.new(0, 5.5, -7), Enum.Material.Limestone, Color3.fromRGB(109, 108, 96))
+
+    local columns = {
+        {Vector3.new(-31, 10, -20), 20},
+        {Vector3.new(-10, 13, -20), 26},
+        {Vector3.new(12, 9, -20), 18},
+        {Vector3.new(32, 12, -20), 24},
+        {Vector3.new(-31, 7, 20), 14},
+        {Vector3.new(-8, 11, 20), 22},
+        {Vector3.new(15, 6, 20), 12},
+        {Vector3.new(32, 9, 20), 18},
+    }
+    for _, entry in ipairs(columns) do
+        local offset = entry[1]
+        local height = entry[2]
+        part(model, "BrokenColumn", Vector3.new(5.2, height, 5.2), base * CFrame.new(offset.X, height / 2 + 2.4, offset.Z), Enum.Material.Limestone, stone)
     end
-    part(model, "LintelFragment", Vector3.new(56, 5, 6), CFrame.new(center.X - 5, y + 28, center.Z) * CFrame.Angles(0, 0, math.rad(4)), Enum.Material.Limestone, stone)
-    part(model, "WallFragmentA", Vector3.new(7, 24, 42), CFrame.new(center.X - 36, y + 12, center.Z - 22) * CFrame.Angles(0, math.rad(18), 0), Enum.Material.Limestone, stone)
-    part(model, "WallFragmentB", Vector3.new(7, 16, 31), CFrame.new(center.X + 42, y + 8, center.Z + 18) * CFrame.Angles(0, math.rad(-20), math.rad(5)), Enum.Material.Limestone, stone)
+
+    part(model, "GatewayLeft", Vector3.new(6, 23, 7), base * CFrame.new(-14, 13.8, 29), Enum.Material.Limestone, stone)
+    part(model, "GatewayRight", Vector3.new(6, 18, 7), base * CFrame.new(14, 11.3, 29), Enum.Material.Limestone, stone)
+    part(model, "GatewayLintel", Vector3.new(35, 5, 7), base * CFrame.new(-2, 24.7, 29) * CFrame.Angles(0, 0, math.rad(4)), Enum.Material.Limestone, stone)
+
+    local rubble = {
+        {Vector3.new(-37, 4.2, -4), Vector3.new(20, 4, 8), math.rad(18)},
+        {Vector3.new(27, 4, 8), Vector3.new(17, 3.5, 7), math.rad(-24)},
+        {Vector3.new(7, 4.1, 31), Vector3.new(22, 3.8, 7), math.rad(11)},
+        {Vector3.new(-18, 4, 7), Vector3.new(13, 3.2, 6), math.rad(-31)},
+    }
+    for _, entry in ipairs(rubble) do
+        part(model, "CollapsedSlab", entry[2], base * CFrame.new(entry[1]) * CFrame.Angles(0, entry[3], math.rad(7)), Enum.Material.Limestone, darkStone)
+    end
 
     return model
 end
@@ -182,29 +210,68 @@ local function buildRiver(parent, config, terrainState, heightAt)
     model.Parent = parent
     markLandmark(model, "river_spine")
 
-    local river = terrainState.RiverPoints
-    for i = 1, #river - 1 do
-        local aRaw, bRaw = river[i], river[i + 1]
-        local ay = heightAt(config, aRaw.X, aRaw.Z) - 8
-        local by = heightAt(config, bRaw.X, bRaw.Z) - 8
-        local a = Vector3.new(aRaw.X, ay, aRaw.Z)
-        local b = Vector3.new(bRaw.X, by, bRaw.Z)
-        local delta = b - a
-        local water = part(model, "RiverWater", Vector3.new(30, 0.55, delta.Magnitude + 4), CFrame.lookAt((a + b) / 2, b), Enum.Material.Glass, Color3.fromRGB(64, 139, 158), 0.28)
-        water.CanCollide = false
-        water.CastShadow = false
+    -- TerrainBuilder owns the river and pool water. Only the moving-water visual,
+    -- foam and intentional trail crossing are built as lightweight parts here.
+    local upperY = heightAt(config, -250, -178) - 6
+    local drop = math.max(24, upperY - terrainState.PoolSurface)
+    local fallCenter = Vector3.new(-254, terrainState.PoolSurface + drop / 2, -156)
+
+    for i = -1, 1 do
+        local fall = part(
+            model,
+            "WaterfallVeil",
+            Vector3.new(11.5, drop, 0.65),
+            CFrame.new(fallCenter + Vector3.new(i * 9.5, 0, i * 0.8)) * CFrame.Angles(0, math.rad(22 + i * 3), 0),
+            Enum.Material.Glass,
+            Color3.fromRGB(190, 228, 234),
+            0.3 + math.abs(i) * 0.06
+        )
+        fall.CanCollide = false
+        fall.CanTouch = false
+        fall.CanQuery = false
+        fall.CastShadow = false
     end
 
-    local pool = part(model, "WaterfallPool", Vector3.new(1, 112, 112), CFrame.new(-275, terrainState.PoolSurface, -115) * CFrame.Angles(0, 0, math.rad(90)), Enum.Material.Glass, Color3.fromRGB(56, 131, 151), 0.24)
-    pool.Shape = Enum.PartType.Cylinder
-    pool.CanCollide = false
-    pool.CastShadow = false
+    for i = 1, 7 do
+        local angle = (i / 7) * math.pi * 2
+        local foam = part(
+            model,
+            "WaterfallFoam",
+            Vector3.new(5.5 + (i % 3), 1.2, 3.5 + (i % 2)),
+            CFrame.new(
+                terrainState.PoolCenter.X + math.cos(angle) * 18,
+                terrainState.PoolSurface + 0.45,
+                terrainState.PoolCenter.Z + math.sin(angle) * 12
+            ),
+            Enum.Material.Glass,
+            Color3.fromRGB(222, 239, 239),
+            0.32
+        )
+        foam.CanCollide = false
+        foam.CanTouch = false
+        foam.CanQuery = false
+        foam.CastShadow = false
+    end
 
-    local upperY = heightAt(config, -235, -185) - 6
-    local drop = math.max(18, upperY - terrainState.PoolSurface)
-    local fall = part(model, "Waterfall", Vector3.new(35, drop, 1.2), CFrame.new(-252, terrainState.PoolSurface + drop / 2, -155) * CFrame.Angles(0, math.rad(24), 0), Enum.Material.Glass, Color3.fromRGB(189, 226, 231), 0.35)
-    fall.CanCollide = false
-    fall.CastShadow = false
+    local bridgeCenter = Vector3.new(-260, heightAt(config, -260, -140) - 1.3, -140)
+    local bridge = Instance.new("Model")
+    bridge.Name = "RiverFootbridge"
+    bridge.Parent = model
+    bridge:SetAttribute("GeneratedPlaceholder", true)
+
+    for i = -3, 3 do
+        local plank = part(
+            bridge,
+            "BridgePlank",
+            Vector3.new(6.6, 0.65, 9.5),
+            CFrame.new(bridgeCenter + Vector3.new(i * 6.2, 0, 0)) * CFrame.Angles(0, 0, math.rad((i % 2) * 1.2)),
+            Enum.Material.WoodPlanks,
+            Color3.fromRGB(101, 76, 48)
+        )
+        plank.CanCollide = true
+    end
+    part(bridge, "BridgeBeamA", Vector3.new(44, 0.8, 1.2), CFrame.new(bridgeCenter + Vector3.new(0, -0.65, -3.7)), Enum.Material.Wood, Color3.fromRGB(80, 59, 38))
+    part(bridge, "BridgeBeamB", Vector3.new(44, 0.8, 1.2), CFrame.new(bridgeCenter + Vector3.new(0, -0.65, 3.7)), Enum.Material.Wood, Color3.fromRGB(80, 59, 38))
 
     return model
 end
