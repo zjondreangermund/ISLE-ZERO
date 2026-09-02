@@ -14,6 +14,34 @@ local function toast(player, message)
     end
 end
 
+local function horizontalDistance(a, b)
+    return Vector2.new(a.X - b.X, a.Z - b.Z).Magnitude
+end
+
+local function safeCampAt(position)
+    for _, zone in ipairs(CollectionService:GetTagged("SafeCampZone")) do
+        if zone:IsA("BasePart") and zone:IsDescendantOf(workspace) then
+            local radius = zone:GetAttribute("SafeRadius") or 29
+            if horizontalDistance(position, zone.Position) <= radius then
+                return zone, radius
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function escapePoint(zone, radius, position, fallback)
+    local delta = Vector3.new(position.X - zone.Position.X, 0, position.Z - zone.Position.Z)
+    if delta.Magnitude < 1 then
+        delta = Vector3.new(fallback.X - zone.Position.X, 0, fallback.Z - zone.Position.Z)
+    end
+    if delta.Magnitude < 1 then
+        delta = Vector3.new(1, 0, 0)
+    end
+    delta = delta.Unit * ((radius or 29) + 8)
+    return Vector3.new(zone.Position.X + delta.X, position.Y, zone.Position.Z + delta.Z)
+end
+
 local function animalPart(model, name, size, cframe, color)
     local object = Instance.new("Part")
     object.Name = name
@@ -74,7 +102,7 @@ local function nearestTarget(origin, range)
         local character = player.Character
         local root = character and character:FindFirstChild("HumanoidRootPart")
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if root and humanoid and humanoid.Health > 0 then
+        if root and humanoid and humanoid.Health > 0 and not safeCampAt(root.Position) then
             local distance = (root.Position - origin).Magnitude
             if distance < nearestDistance then
                 nearestDistance = distance
@@ -86,6 +114,37 @@ local function nearestTarget(origin, range)
     end
 
     return nearestPlayer, nearestRoot, nearestHumanoid, nearestDistance
+end
+
+local function createRawMeatDrop(position, guardianType)
+    local amount = guardianType == "MarshCroc" and 2 or 1
+    local meat = Instance.new("Part")
+    meat.Name = "RawWildMeat"
+    meat.Anchored = true
+    meat.CanCollide = false
+    meat.CanTouch = false
+    meat.Size = Vector3.new(2.4, 0.85, 1.8)
+    meat.CFrame = CFrame.new(position + Vector3.new(0, 1.2, 0)) * CFrame.Angles(0, math.rad(25), 0)
+    meat.Material = Enum.Material.SmoothPlastic
+    meat.Color = Color3.fromRGB(135, 62, 55)
+    meat:SetAttribute("FoodId", "RawMeat")
+    meat:SetAttribute("Amount", amount)
+    meat.Parent = workspace
+    CollectionService:AddTag(meat, "FoodPickup")
+
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.ActionText = "Collect meat"
+    prompt.ObjectText = amount > 1 and "Raw wild meat x2" or "Raw wild meat"
+    prompt.HoldDuration = 0.2
+    prompt.MaxActivationDistance = 9
+    prompt.RequiresLineOfSight = false
+    prompt.Parent = meat
+
+    task.delay(180, function()
+        if meat.Parent then
+            meat:Destroy()
+        end
+    end)
 end
 
 local function spawnEnemy(marker)
@@ -157,30 +216,37 @@ local function spawnEnemy(marker)
     task.spawn(function()
         while model.Parent and humanoid.Health > 0 do
             task.wait(0.32)
-            local player, targetRoot, targetHumanoid, distance = nearestTarget(root.Position, definition.AggroRange or 50)
-            local homeDistance = (root.Position - home).Magnitude
+            local zone, safeRadius = safeCampAt(root.Position)
+            if zone then
+                humanoid:MoveTo(escapePoint(zone, safeRadius, root.Position, home))
+            else
+                local player, targetRoot, targetHumanoid, distance = nearestTarget(root.Position, definition.AggroRange or 50)
+                local homeDistance = (root.Position - home).Magnitude
 
-            if player and targetRoot and targetHumanoid and homeDistance < 115 then
-                humanoid:MoveTo(targetRoot.Position)
-                if distance <= (definition.AttackRange or 5) and os.clock() - lastAttack >= 1.35 then
-                    lastAttack = os.clock()
-                    targetHumanoid:TakeDamage(definition.Damage or 8)
-                    toast(player, definition.DisplayName .. " attacked you!")
+                if player and targetRoot and targetHumanoid and homeDistance < 115 then
+                    humanoid:MoveTo(targetRoot.Position)
+                    if distance <= (definition.AttackRange or 5) and os.clock() - lastAttack >= 1.35 then
+                        lastAttack = os.clock()
+                        targetHumanoid:TakeDamage(definition.Damage or 8)
+                        toast(player, definition.DisplayName .. " attacked you!")
+                    end
+                elseif homeDistance > 8 then
+                    humanoid:MoveTo(home)
                 end
-            elseif homeDistance > 8 then
-                humanoid:MoveTo(home)
             end
         end
     end)
 
     humanoid.Died:Connect(function()
+        local deathPosition = root.Position
         local killerId = model:GetAttribute("LastHitUserId")
         local killer = killerId and Players:GetPlayerByUserId(killerId)
         if killer then
             killer:SetAttribute("WorldEnemiesDefeated", (killer:GetAttribute("WorldEnemiesDefeated") or 0) + 1)
-            toast(killer, string.format("%s defeated. Search the area for hidden caches.", definition.DisplayName))
+            toast(killer, string.format("%s defeated. It dropped meat you can cook at a camp.", definition.DisplayName))
         end
 
+        createRawMeatDrop(deathPosition, guardianType)
         activeByMarker[marker] = nil
         task.delay(4, function()
             if model.Parent then
@@ -203,7 +269,7 @@ local function bindWorld()
             count += 1
         end
     end
-    print(string.format("[ISLE//ZERO][WILDLIFE] %d roaming encounters activated", count))
+    print(string.format("[ISLE//ZERO][WILDLIFE] %d roaming encounters activated; built camps are safe zones", count))
 end
 
 workspace:GetAttributeChangedSignal("ISLEZeroGenerated"):Connect(function()
