@@ -19,6 +19,21 @@ local NATURE_PREFIXES = {
     Mangrove = {"mangrove"},
 }
 
+local CREATURE_ALIASES = {
+    WildBoar = {"wildboar", "boar"},
+    CaveBoar = {"caveboar", "boarboss", "bossboar"},
+    MarshCroc = {"marshcroc", "marshcrocodile", "crocodile"},
+    SaltwaterCroc = {"saltwatercroc", "saltwatercrocodile", "smugglercroc", "crocodile"},
+    TimberWolf = {"timberwolf", "wolf", "greywolf", "graywolf"},
+    RidgeWolf = {"ridgewolf", "mountainwolf", "wolf"},
+    IceWolf = {"icewolf", "frostwolf", "snowwolf", "arcticwolf"},
+    JungleStalker = {"junglestalker", "leopard", "panther", "jaguar"},
+    BlackJaguar = {"blackjaguar", "blackpanther", "jaguar", "panther"},
+    FeralHound = {"feralhound", "hound", "wilddog"},
+    IceBear = {"icebear", "polarbear", "snowbear", "arcticbear"},
+    JungleSnake = {"junglesnake", "snake", "viper", "cobra"},
+}
+
 local function normalizeName(value)
     return string.lower((string.gsub(tostring(value), "[%s_%-]", "")))
 end
@@ -29,8 +44,6 @@ local function stripExecutableContent(root)
             or descendant:IsA("LocalScript")
             or descendant:IsA("ModuleScript")
             or descendant:IsA("Humanoid")
-            or descendant:IsA("Animator")
-            or descendant:IsA("AnimationController")
         if remove then
             descendant:Destroy()
         end
@@ -39,6 +52,19 @@ end
 
 local function isVisualAsset(instance)
     return instance:IsA("Model") or instance:IsA("BasePart")
+end
+
+local function matchesAlias(name, key, aliases)
+    local normalized = normalizeName(name)
+    if normalized == normalizeName(key) then
+        return true
+    end
+    for _, alias in ipairs(aliases[key] or {}) do
+        if normalized == alias or string.sub(normalized, 1, #alias) == alias then
+            return true
+        end
+    end
+    return false
 end
 
 local function nameMatchesNatureKey(name, key)
@@ -68,6 +94,8 @@ local function gatherAssetCandidates(key, preferredFolder)
         local matches
         if preferredFolder == "Nature" then
             matches = nameMatchesNatureKey(instance.Name, key)
+        elseif preferredFolder == "Creatures" then
+            matches = matchesAlias(instance.Name, key, CREATURE_ALIASES)
         else
             matches = normalizeName(instance.Name) == normalizeName(key)
         end
@@ -81,11 +109,11 @@ local function gatherAssetCandidates(key, preferredFolder)
     if preferredFolder then
         local folder = assets:FindFirstChild(preferredFolder)
         if folder then
-            for _, descendant in ipairs(folder:GetDescendants()) do
-                consider(descendant)
-            end
             for _, child in ipairs(folder:GetChildren()) do
                 consider(child)
+            end
+            for _, descendant in ipairs(folder:GetDescendants()) do
+                consider(descendant)
             end
         end
     end
@@ -142,6 +170,34 @@ local function prepareStaticVisual(instance)
     end
 end
 
+local function internalRigged(instance)
+    if not instance:IsA("Model") then
+        return false
+    end
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA("Motor6D") or descendant:IsA("Bone") or descendant:IsA("Weld") or descendant:IsA("WeldConstraint") then
+            return true
+        end
+    end
+    return false
+end
+
+local function creatureVisualRoot(instance)
+    if instance:IsA("BasePart") then
+        return instance
+    end
+    if instance.PrimaryPart then
+        return instance.PrimaryPart
+    end
+    for _, name in ipairs({"HumanoidRootPart", "RootPart", "Root", "Torso", "Body"}) do
+        local candidate = instance:FindFirstChild(name, true)
+        if candidate and candidate:IsA("BasePart") then
+            return candidate
+        end
+    end
+    return instance:FindFirstChildWhichIsA("BasePart", true)
+end
+
 local function prepareCreatureVisual(instance, root)
     local parts = {}
     if instance:IsA("BasePart") then
@@ -160,13 +216,29 @@ local function prepareCreatureVisual(instance, root)
         part.CanTouch = false
         part.CanQuery = false
         part.Massless = true
-
-        local weld = Instance.new("WeldConstraint")
-        weld.Name = "ISLEZeroVisualWeld"
-        weld.Part0 = root
-        weld.Part1 = part
-        weld.Parent = root
     end
+
+    local visualRoot = creatureVisualRoot(instance)
+    if not visualRoot then
+        return false
+    end
+
+    if internalRigged(instance) then
+        local weld = Instance.new("WeldConstraint")
+        weld.Name = "ISLEZeroVisualRootWeld"
+        weld.Part0 = root
+        weld.Part1 = visualRoot
+        weld.Parent = root
+    else
+        for _, part in ipairs(parts) do
+            local weld = Instance.new("WeldConstraint")
+            weld.Name = "ISLEZeroVisualWeld"
+            weld.Part0 = root
+            weld.Part1 = part
+            weld.Parent = root
+        end
+    end
+    return true
 end
 
 local function pivotInstance(instance, cframe)
@@ -178,6 +250,23 @@ local function pivotInstance(instance, cframe)
         instance:PivotTo(target)
     elseif instance:IsA("BasePart") then
         instance.CFrame = target
+    end
+end
+
+local function alignCreatureToRoot(instance, model, root)
+    local yaw = math.rad(instance:GetAttribute("ISLEZeroYaw") or 0)
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    local footY = root.Position.Y - root.Size.Y / 2 - (humanoid and humanoid.HipHeight or 0)
+    local offsetY = instance:GetAttribute("ISLEZeroYOffset") or 0
+    local target = root.CFrame * CFrame.Angles(0, yaw, 0)
+
+    if instance:IsA("Model") then
+        instance:PivotTo(target)
+        local boxCFrame, boxSize = instance:GetBoundingBox()
+        local bottomY = boxCFrame.Position.Y - boxSize.Y / 2
+        instance:PivotTo(instance:GetPivot() + Vector3.new(0, footY + offsetY - bottomY, 0))
+    elseif instance:IsA("BasePart") then
+        instance.CFrame = CFrame.new(root.Position.X, footY + instance.Size.Y / 2 + offsetY, root.Position.Z) * root.CFrame.Rotation * CFrame.Angles(0, yaw, 0)
     end
 end
 
@@ -244,7 +333,7 @@ local function preferredStaticFolder(model, key)
     if key == "WorldChest" or key == "CaveChest" then
         return "Props"
     end
-    if model.Name == "SafeTent" then
+    if key == "TreeHouse" or model.Name == "SafeTent" then
         return "Structures"
     end
     return "Structures"
@@ -275,13 +364,17 @@ local function tryCreature(model)
     visual.Name = "AUTHORED_" .. tostring(guardianType)
     stripExecutableContent(visual)
     visual.Parent = model
-    pivotInstance(visual, root.CFrame)
-    prepareCreatureVisual(visual, root)
+    alignCreatureToRoot(visual, model, root)
+    if not prepareCreatureVisual(visual, root) then
+        visual:Destroy()
+        return false
+    end
 
     applied[model] = true
     model:SetAttribute("VisualAssetApplied", true)
     model:SetAttribute("VisualAssetKey", tostring(guardianType))
     model:SetAttribute("VisualAssetSource", source.Name)
+    model:SetAttribute("VisualRigged", internalRigged(visual))
     return true
 end
 
