@@ -157,13 +157,14 @@ local function tryCreature(model)
         return false
     end
 
+    hideGeneratedVisuals(model, root)
+
     local visual = source:Clone()
     visual.Name = "AUTHORED_" .. tostring(guardianType)
     stripExecutableContent(visual)
     visual.Parent = model
     pivotInstance(visual, root.CFrame)
     prepareCreatureVisual(visual, root)
-    hideGeneratedVisuals(model, root)
 
     applied[model] = true
     model:SetAttribute("VisualAssetApplied", true)
