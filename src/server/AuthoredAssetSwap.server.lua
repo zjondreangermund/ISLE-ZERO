@@ -14,9 +14,13 @@ local STATIC_KEY_OVERRIDES = {
 
 local function stripExecutableContent(root)
     for _, descendant in ipairs(root:GetDescendants()) do
-        if descendant:IsA("Script") or descendant:IsA("LocalScript") or descendant:IsA("ModuleScript") then
-            descendant:Destroy()
-        elseif descendant:IsA("Humanoid") or descendant:IsA("Animator") or descendant:IsA("AnimationController") then
+        local remove = descendant:IsA("Script")
+            or descendant:IsA("LocalScript")
+            or descendant:IsA("ModuleScript")
+            or descendant:IsA("Humanoid")
+            or descendant:IsA("Animator")
+            or descendant:IsA("AnimationController")
+        if remove then
             descendant:Destroy()
         end
     end
