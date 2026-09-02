@@ -5,7 +5,6 @@ local WorldConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 
 local ROUTE_CLEARANCE = 13.5
 local LANDMARK_CLEARANCE = 11
-local processedGeneration = -1
 
 local function horizontalPosition(position)
     return Vector2.new(position.X, position.Z)
@@ -62,13 +61,15 @@ local function authoredVisualNear(instance, position)
     return nil
 end
 
-local function isNearRouteFurniture(position)
+local function collectFurnitureClearances()
+    local clearances = {}
+
     for _, tagged in ipairs(CollectionService:GetTagged("SafeCampZone")) do
         if tagged:IsA("BasePart") and tagged:IsDescendantOf(workspace) then
-            local delta = horizontalPosition(position) - horizontalPosition(tagged.Position)
-            if delta.Magnitude <= (tagged:GetAttribute("SafeRadius") or 29) + 5 then
-                return true
-            end
+            table.insert(clearances, {
+                Position = tagged.Position,
+                Radius = (tagged:GetAttribute("SafeRadius") or 29) + 5,
+            })
         end
     end
 
@@ -78,52 +79,47 @@ local function isNearRouteFurniture(position)
             or string.find(descendant.Name, "Direction", 1, true)
             or string.find(descendant.Name, "MapBoard", 1, true)
         ) then
-            local delta = horizontalPosition(position) - horizontalPosition(descendant.Position)
-            if delta.Magnitude <= LANDMARK_CLEARANCE then
-                return true
-            end
+            table.insert(clearances, {
+                Position = descendant.Position,
+                Radius = LANDMARK_CLEARANCE,
+            })
         end
     end
 
+    return clearances
+end
+
+local function isNearFurniture(position, clearances)
+    local point = horizontalPosition(position)
+    for _, clearance in ipairs(clearances) do
+        if (point - horizontalPosition(clearance.Position)).Magnitude <= clearance.Radius then
+            return true
+        end
+    end
     return false
 end
 
-local function shouldRemoveVegetation(instance)
-    local position = instancePosition(instance)
-    if not position then
-        return false
-    end
-
-    if distanceToConfiguredPaths(position) <= ROUTE_CLEARANCE then
-        return true
-    end
-
-    return isNearRouteFurniture(position)
-end
-
 local function polish()
-    local generation = workspace:GetAttribute("ISLEZeroGenerationSerial") or 0
-    if generation == processedGeneration then
-        return
-    end
-    processedGeneration = generation
-
     local removed = 0
     local authoredRemoved = 0
+    local clearances = collectFurnitureClearances()
     local candidates = CollectionService:GetTagged("WorldVegetation")
 
     for _, vegetation in ipairs(candidates) do
-        if vegetation:IsDescendantOf(workspace) and shouldRemoveVegetation(vegetation) then
+        if vegetation:IsDescendantOf(workspace) then
             local position = instancePosition(vegetation)
-            if position then
+            local remove = position
+                and (distanceToConfiguredPaths(position) <= ROUTE_CLEARANCE or isNearFurniture(position, clearances))
+
+            if remove and position then
                 local authored = authoredVisualNear(vegetation, position)
                 if authored then
                     authored:Destroy()
                     authoredRemoved += 1
                 end
+                vegetation:Destroy()
+                removed += 1
             end
-            vegetation:Destroy()
-            removed += 1
         end
     end
 
@@ -136,11 +132,11 @@ end
 
 workspace:GetAttributeChangedSignal("ISLEZeroGenerated"):Connect(function()
     if workspace:GetAttribute("ISLEZeroGenerated") == true then
-        task.delay(0.25, polish)
-        task.delay(1.5, polish)
+        task.delay(0.2, polish)
+        task.delay(1.4, polish)
     end
 end)
 
 if workspace:GetAttribute("ISLEZeroGenerated") == true then
-    task.delay(0.25, polish)
+    task.delay(0.2, polish)
 end
