@@ -191,9 +191,7 @@ local function bindTool(tool)
         local definition = itemId and GameplayConfig.Items[itemId]
         if definition and definition.Damage then
             actionRemote:FireServer("Attack", itemId)
-        elseif definition and definition.Heal then
-            actionRemote:FireServer("Use", itemId)
-        elseif itemId == "AncientCompass" then
+        elseif (definition and definition.Heal) or itemId == "AncientCompass" then
             actionRemote:FireServer("Use", itemId)
         end
     end)
