@@ -198,6 +198,16 @@ local function alignNatureToGround(instance, placementPosition, yawDegrees)
     end
 end
 
+local function naturePlacementPosition(model)
+    local explicit = model:GetAttribute("PlacementPosition")
+    if typeof(explicit) == "Vector3" then
+        return explicit
+    end
+
+    local boxCFrame, boxSize = model:GetBoundingBox()
+    return Vector3.new(boxCFrame.Position.X, boxCFrame.Position.Y - boxSize.Y / 2, boxCFrame.Position.Z)
+end
+
 local function hideGeneratedVisuals(model, exceptRoot)
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") and descendant ~= exceptRoot then
@@ -304,9 +314,8 @@ local function tryStatic(model)
     stripExecutableContent(visual)
     visual.Parent = model.Parent
 
-    local isNature = preferredFolder == "Nature"
-    local placementPosition = model:GetAttribute("PlacementPosition")
-    if isNature and typeof(placementPosition) == "Vector3" then
+    if preferredFolder == "Nature" then
+        local placementPosition = naturePlacementPosition(model)
         local yaw = deterministicIndex(model, 360) - 1
         alignNatureToGround(visual, placementPosition, yaw)
     else
