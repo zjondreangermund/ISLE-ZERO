@@ -1,9 +1,38 @@
-local MAX_TREEHOUSE_EXTENT = 78
-local MIN_TREEHOUSE_EXTENT = 10
+local AUTHORED_PREFIX = "AUTHORED_"
 local TREEHOUSE_KEY = "AUTHORED_TreeHouse_"
+
+local LIMITS = {
+    TreeHouse = 64,
+    SafeTent = 28,
+    JungleTree = 86,
+    EmergentTree = 105,
+    Palm = 78,
+    Mangrove = 62,
+    WorldChest = 18,
+    CaveChest = 18,
+}
+
+local DEFAULT_LIMIT = 72
+local PART_LIMIT_MULTIPLIER = 1.2
+local OUTLIER_DISTANCE_MULTIPLIER = 1.35
+
+local processed = setmetatable({}, {__mode = "k"})
 
 local function startsWith(value, prefix)
     return string.sub(value, 1, #prefix) == prefix
+end
+
+local function authoredKey(name)
+    if not startsWith(name, AUTHORED_PREFIX) then
+        return nil
+    end
+
+    local rest = string.sub(name, #AUTHORED_PREFIX + 1)
+    local separator = string.find(rest, "_", 1, true)
+    if separator then
+        return string.sub(rest, 1, separator - 1)
+    end
+    return rest
 end
 
 local function boundsOf(instance)
@@ -27,15 +56,61 @@ local function scaleVisual(instance, factor)
     end
 
     if instance:IsA("Model") then
-        local ok = pcall(function()
+        return pcall(function()
             instance:ScaleTo(instance:GetScale() * factor)
         end)
-        return ok
     elseif instance:IsA("BasePart") then
         instance.Size *= factor
         return true
     end
     return false
+end
+
+local function visualPivot(instance)
+    if instance:IsA("Model") or instance:IsA("BasePart") then
+        return instance:GetPivot().Position
+    end
+    return Vector3.zero
+end
+
+local function removeUnsupportedContent(instance)
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA("Sound") then
+            descendant:Destroy()
+        elseif descendant:IsA("BasePart") then
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+        end
+    end
+end
+
+local function sanitizeOutlierParts(instance, limit)
+    local center = visualPivot(instance)
+    local removed = 0
+    local maxPartExtent = limit * PART_LIMIT_MULTIPLIER
+    local maxDistance = limit * OUTLIER_DISTANCE_MULTIPLIER
+
+    local descendants = instance:IsA("Model") and instance:GetDescendants() or {instance}
+    for _, descendant in ipairs(descendants) do
+        if descendant:IsA("BasePart") then
+            local size = descendant.Size
+            local largest = math.max(size.X, size.Y, size.Z)
+            local distance = (descendant.Position - center).Magnitude
+
+            if largest > maxPartExtent or distance > maxDistance then
+                warn(string.format(
+                    "[ISLE//ZERO][ASSET SAFETY] Quarantined oversized/outlier part %s (extent %.1f, distance %.1f).",
+                    descendant:GetFullName(),
+                    largest,
+                    distance
+                ))
+                descendant:Destroy()
+                removed += 1
+            end
+        end
+    end
+    return removed
 end
 
 local function findTreeHousePlaceholder()
@@ -46,7 +121,7 @@ local function findTreeHousePlaceholder()
     return root:FindFirstChild("JungleTreeHouse", true)
 end
 
-local function realignToPlaceholder(instance)
+local function realignTreeHouse(instance)
     local placeholder = findTreeHousePlaceholder()
     if not placeholder or not placeholder:IsA("Model") then
         return
@@ -59,13 +134,13 @@ local function realignToPlaceholder(instance)
         instance.CFrame = targetPivot
     end
 
-    local _, targetSize = boundsOf(placeholder)
+    local placeholderCf, placeholderSize = boundsOf(placeholder)
     local visualCf, visualSize = boundsOf(instance)
-    if not targetSize or not visualCf or not visualSize then
+    if not placeholderCf or not placeholderSize or not visualCf or not visualSize then
         return
     end
 
-    local targetBottom = select(1, placeholder:GetBoundingBox()).Position.Y - targetSize.Y / 2
+    local targetBottom = placeholderCf.Position.Y - placeholderSize.Y / 2
     local visualBottom = visualCf.Position.Y - visualSize.Y / 2
     local deltaY = targetBottom - visualBottom
 
@@ -76,61 +151,77 @@ local function realignToPlaceholder(instance)
     end
 end
 
-local function validateTreeHouse(instance)
-    if not (instance:IsA("Model") or instance:IsA("BasePart")) then
+local function validateAuthoredVisual(instance)
+    if processed[instance] or not (instance:IsA("Model") or instance:IsA("BasePart")) then
         return
     end
-    if not startsWith(instance.Name, TREEHOUSE_KEY) then
-        return
-    end
-    if instance:GetAttribute("ISLEZeroStructureValidated") then
+    if not startsWith(instance.Name, AUTHORED_PREFIX) then
         return
     end
 
-    instance:SetAttribute("ISLEZeroStructureValidated", true)
+    processed[instance] = true
+    removeUnsupportedContent(instance)
 
+    local key = authoredKey(instance.Name) or "Unknown"
+    local limit = LIMITS[key] or DEFAULT_LIMIT
     local _, size = boundsOf(instance)
     if not size then
         return
     end
 
     local largest = math.max(size.X, size.Y, size.Z)
-    if largest <= 0 then
-        return
-    end
-
-    if largest > MAX_TREEHOUSE_EXTENT then
-        local factor = MAX_TREEHOUSE_EXTENT / largest
+    if largest > limit then
+        local factor = limit / largest
         if scaleVisual(instance, factor) then
             warn(string.format(
-                "[ISLE//ZERO][ASSET SAFETY] Tree House asset was %.1f studs across; auto-scaled by %.3f to prevent an oversized world obstruction.",
+                "[ISLE//ZERO][ASSET SAFETY] %s authored visual was %.1f studs across; auto-scaled to %.1f studs.",
+                key,
                 largest,
-                factor
-            ))
-        end
-    elseif largest < MIN_TREEHOUSE_EXTENT then
-        local factor = MIN_TREEHOUSE_EXTENT / largest
-        if scaleVisual(instance, factor) then
-            warn(string.format(
-                "[ISLE//ZERO][ASSET SAFETY] Tree House asset was unusually small; scaled by %.3f for world use.",
-                factor
+                limit
             ))
         end
     end
 
-    realignToPlaceholder(instance)
+    local removed = sanitizeOutlierParts(instance, limit)
+    if key == "TreeHouse" or startsWith(instance.Name, TREEHOUSE_KEY) then
+        realignTreeHouse(instance)
+    end
+
+    local _, finalSize = boundsOf(instance)
+    if finalSize then
+        local finalLargest = math.max(finalSize.X, finalSize.Y, finalSize.Z)
+        if finalLargest > limit * 1.45 then
+            warn(string.format(
+                "[ISLE//ZERO][ASSET SAFETY] %s remains oversized after cleanup (%.1f studs). Hiding remaining authored geometry for this run.",
+                instance.Name,
+                finalLargest
+            ))
+            for _, descendant in ipairs(instance:GetDescendants()) do
+                if descendant:IsA("BasePart") then
+                    descendant.Transparency = 1
+                    descendant.CanCollide = false
+                end
+            end
+            if instance:IsA("BasePart") then
+                instance.Transparency = 1
+                instance.CanCollide = false
+            end
+        elseif removed > 0 then
+            print(string.format("[ISLE//ZERO][ASSET SAFETY] %s cleaned; %d invalid parts removed", instance.Name, removed))
+        end
+    end
 end
 
 workspace.DescendantAdded:Connect(function(instance)
-    if startsWith(instance.Name, TREEHOUSE_KEY) then
-        task.delay(0.1, validateTreeHouse, instance)
+    if (instance:IsA("Model") or instance:IsA("BasePart")) and startsWith(instance.Name, AUTHORED_PREFIX) then
+        task.delay(0.12, validateAuthoredVisual, instance)
     end
 end)
 
 local function scan()
     for _, instance in ipairs(workspace:GetDescendants()) do
-        if startsWith(instance.Name, TREEHOUSE_KEY) then
-            validateTreeHouse(instance)
+        if (instance:IsA("Model") or instance:IsA("BasePart")) and startsWith(instance.Name, AUTHORED_PREFIX) then
+            validateAuthoredVisual(instance)
         end
     end
 end
@@ -138,6 +229,7 @@ end
 workspace:GetAttributeChangedSignal("ISLEZeroGenerated"):Connect(function()
     if workspace:GetAttribute("ISLEZeroGenerated") == true then
         task.delay(0.5, scan)
+        task.delay(2, scan)
     end
 end)
 
