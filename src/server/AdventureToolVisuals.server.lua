@@ -1,4 +1,12 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local assets = ReplicatedStorage:WaitForChild("ISLEZeroAssets")
+local toolsFolder = assets:WaitForChild("Tools")
+
+local function normalizeName(value)
+    return string.lower((string.gsub(tostring(value), "[%s_%-]", "")))
+end
 
 local function weld(handle, object)
     local constraint = Instance.new("WeldConstraint")
@@ -25,16 +33,95 @@ local function addPart(tool, handle, name, size, offset, material, color)
     return object
 end
 
-local function styleTool(tool)
-    if not tool:IsA("Tool") or tool:GetAttribute("AdventureStyled") then
-        return
+local function findAuthored(itemId)
+    local normalized = normalizeName(itemId)
+    for _, child in ipairs(toolsFolder:GetChildren()) do
+        if (child:IsA("Model") or child:IsA("BasePart")) and normalizeName(child.Name) == normalized then
+            return child
+        end
     end
-    local itemId = tool:GetAttribute("ItemId")
-    local handle = tool:FindFirstChild("Handle")
-    if not itemId or not handle or not handle:IsA("BasePart") then
-        return
+    for _, descendant in ipairs(toolsFolder:GetDescendants()) do
+        if (descendant:IsA("Model") or descendant:IsA("BasePart")) and normalizeName(descendant.Name) == normalized then
+            return descendant
+        end
+    end
+    return nil
+end
+
+local function stripExecutableContent(root)
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA("Script") or descendant:IsA("LocalScript") or descendant:IsA("ModuleScript") or descendant:IsA("Humanoid") then
+            descendant:Destroy()
+        end
+    end
+end
+
+local function authoredParts(instance)
+    local parts = {}
+    if instance:IsA("BasePart") then
+        table.insert(parts, instance)
+    else
+        for _, descendant in ipairs(instance:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                table.insert(parts, descendant)
+            end
+        end
+    end
+    return parts
+end
+
+local function useAuthored(tool, handle, itemId)
+    local source = findAuthored(itemId)
+    if not source then
+        return false
     end
 
+    local visual = source:Clone()
+    visual.Name = "AUTHORED_TOOL_" .. itemId
+    stripExecutableContent(visual)
+    visual.Parent = tool
+
+    if visual:IsA("Model") then
+        local scale = visual:GetAttribute("ISLEZeroScale")
+        if typeof(scale) == "number" and scale > 0 then
+            pcall(function()
+                visual:ScaleTo(scale)
+            end)
+        end
+    end
+
+    local offset = visual:GetAttribute("ISLEZeroToolOffset")
+    if typeof(offset) ~= "Vector3" then
+        offset = Vector3.zero
+    end
+    local yaw = math.rad(visual:GetAttribute("ISLEZeroYaw") or 0)
+    local pitch = math.rad(visual:GetAttribute("ISLEZeroPitch") or 0)
+    local roll = math.rad(visual:GetAttribute("ISLEZeroRoll") or 0)
+    local target = handle.CFrame * CFrame.new(offset) * CFrame.Angles(pitch, yaw, roll)
+
+    if visual:IsA("Model") then
+        visual:PivotTo(target)
+    else
+        visual.CFrame = target
+    end
+
+    local parts = authoredParts(visual)
+    for _, part in ipairs(parts) do
+        part.Anchored = false
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+        part.Massless = true
+        weld(handle, part)
+    end
+
+    handle.Transparency = 1
+    tool:SetAttribute("AdventureStyled", true)
+    tool:SetAttribute("AuthoredToolVisual", source.Name)
+    return true
+end
+
+local function styleProcedural(tool, handle, itemId)
     if itemId == "HunterSpear" then
         tool:SetAttribute("AdventureStyled", true)
         handle.Size = Vector3.new(0.55, 6.5, 0.55)
@@ -86,6 +173,22 @@ local function styleTool(tool)
     end
 end
 
+local function styleTool(tool)
+    if not tool:IsA("Tool") or tool:GetAttribute("AdventureStyled") then
+        return
+    end
+    local itemId = tool:GetAttribute("ItemId")
+    local handle = tool:FindFirstChild("Handle")
+    if not itemId or not handle or not handle:IsA("BasePart") then
+        return
+    end
+
+    if useAuthored(tool, handle, tostring(itemId)) then
+        return
+    end
+    styleProcedural(tool, handle, tostring(itemId))
+end
+
 local function bindContainer(container)
     for _, child in ipairs(container:GetChildren()) do
         task.defer(styleTool, child)
@@ -108,3 +211,16 @@ Players.PlayerAdded:Connect(bindPlayer)
 for _, player in ipairs(Players:GetPlayers()) do
     task.defer(bindPlayer, player)
 end
+
+toolsFolder.DescendantAdded:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        local backpack = player:FindFirstChildOfClass("Backpack")
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and tool:GetAttribute("AdventureStyled") ~= true then
+                    task.defer(styleTool, tool)
+                end
+            end
+        end
+    end
+end)
