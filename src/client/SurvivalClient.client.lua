@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local GameplayConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameplayConfig"))
 local remotes = ReplicatedStorage:WaitForChild("ISLEZeroSurvival")
 local actionRemote = remotes:WaitForChild("Action")
 local stateRemote = remotes:WaitForChild("State")
@@ -17,7 +18,7 @@ gui.Parent = player:WaitForChild("PlayerGui")
 
 local panel = Instance.new("Frame")
 panel.Name = "InventoryPanel"
-panel.Size = UDim2.fromOffset(285, 230)
+panel.Size = UDim2.fromOffset(310, 270)
 panel.Position = UDim2.fromOffset(18, 108)
 panel.BackgroundColor3 = Color3.fromRGB(18, 23, 20)
 panel.BackgroundTransparency = 0.16
@@ -39,7 +40,7 @@ title.BackgroundTransparency = 1
 title.Position = UDim2.fromOffset(14, 10)
 title.Size = UDim2.new(1, -28, 0, 26)
 title.Font = Enum.Font.GothamBold
-title.Text = "ISLE//ZERO  •  SURVIVAL KIT"
+title.Text = "ISLE//ZERO  •  EXPEDITION KIT"
 title.TextColor3 = Color3.fromRGB(231, 229, 207)
 title.TextSize = 15
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -48,10 +49,10 @@ title.Parent = panel
 local inventoryLabel = Instance.new("TextLabel")
 inventoryLabel.BackgroundTransparency = 1
 inventoryLabel.Position = UDim2.fromOffset(14, 43)
-inventoryLabel.Size = UDim2.new(1, -28, 0, 105)
+inventoryLabel.Size = UDim2.new(1, -28, 0, 145)
 inventoryLabel.Font = Enum.Font.Code
 inventoryLabel.TextColor3 = Color3.fromRGB(209, 211, 192)
-inventoryLabel.TextSize = 14
+inventoryLabel.TextSize = 13
 inventoryLabel.TextXAlignment = Enum.TextXAlignment.Left
 inventoryLabel.TextYAlignment = Enum.TextYAlignment.Top
 inventoryLabel.Text = "Loading supplies..."
@@ -59,19 +60,19 @@ inventoryLabel.Parent = panel
 
 local statsLabel = Instance.new("TextLabel")
 statsLabel.BackgroundTransparency = 1
-statsLabel.Position = UDim2.fromOffset(14, 151)
+statsLabel.Position = UDim2.fromOffset(14, 191)
 statsLabel.Size = UDim2.new(1, -28, 0, 29)
 statsLabel.Font = Enum.Font.GothamBold
 statsLabel.TextColor3 = Color3.fromRGB(213, 182, 92)
-statsLabel.TextSize = 14
+statsLabel.TextSize = 13
 statsLabel.TextXAlignment = Enum.TextXAlignment.Left
-statsLabel.Text = "TREASURE  0    •    CAVES  0"
+statsLabel.Text = "TREASURE 0 • CAVES 0 • WILDLIFE 0"
 statsLabel.Parent = panel
 
 local campLabel = Instance.new("TextLabel")
 campLabel.BackgroundTransparency = 1
-campLabel.Position = UDim2.fromOffset(14, 181)
-campLabel.Size = UDim2.new(1, -28, 0, 36)
+campLabel.Position = UDim2.fromOffset(14, 220)
+campLabel.Size = UDim2.new(1, -28, 0, 42)
 campLabel.Font = Enum.Font.Gotham
 campLabel.TextColor3 = Color3.fromRGB(169, 189, 164)
 campLabel.TextSize = 12
@@ -85,14 +86,14 @@ local hint = Instance.new("TextLabel")
 hint.Name = "ControlHint"
 hint.AnchorPoint = Vector2.new(0.5, 1)
 hint.Position = UDim2.new(0.5, 0, 1, -22)
-hint.Size = UDim2.fromOffset(510, 42)
+hint.Size = UDim2.fromOffset(650, 42)
 hint.BackgroundColor3 = Color3.fromRGB(17, 20, 18)
 hint.BackgroundTransparency = 0.22
 hint.BorderSizePixel = 0
 hint.Font = Enum.Font.GothamBold
 hint.TextColor3 = Color3.fromRGB(233, 230, 208)
-hint.TextSize = 14
-hint.Text = "E / TAP: interact    •    Equip MACHETE + CLICK/TAP: attack    •    Equip MEDKIT + CLICK/TAP: heal"
+hint.TextSize = 13
+hint.Text = "E / TAP: interact  •  Equip weapon + CLICK/TAP: attack  •  Equip healing item + CLICK/TAP: heal  •  Compass: CLICK/TAP"
 hint.Parent = gui
 Instance.new("UICorner", hint).CornerRadius = UDim.new(0, 8)
 
@@ -100,7 +101,7 @@ local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
 toast.AnchorPoint = Vector2.new(0.5, 0)
 toast.Position = UDim2.new(0.5, 0, 0, 85)
-toast.Size = UDim2.fromOffset(500, 48)
+toast.Size = UDim2.fromOffset(540, 50)
 toast.BackgroundColor3 = Color3.fromRGB(19, 23, 20)
 toast.BackgroundTransparency = 1
 toast.BorderSizePixel = 0
@@ -113,6 +114,8 @@ toast.Parent = gui
 Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 9)
 
 local latestToast = 0
+local latestPacket = nil
+
 local function showToast(message)
     latestToast += 1
     local token = latestToast
@@ -137,28 +140,43 @@ local function amount(inventory, key)
     return inventory[key] or 0
 end
 
+local function renderStats()
+    local packet = latestPacket or {}
+    statsLabel.Text = string.format(
+        "TREASURE %d  •  CAVES %d  •  WILDLIFE %d",
+        packet.TreasureValue or 0,
+        packet.CavesCleared or 0,
+        player:GetAttribute("WorldEnemiesDefeated") or 0
+    )
+end
+
 local function renderState(packet)
     if type(packet) ~= "table" then
         return
     end
+    latestPacket = packet
     local inventory = packet.Inventory or {}
     inventoryLabel.Text = string.format(
-        "WOOD   %02d     CLOTH  %02d\nROPE   %02d     STONE  %02d\nHERB   %02d     COINS  %02d\nRUBY   %02d     GOLD   %02d\nSHARD  %02d",
+        "WOOD   %02d   CLOTH  %02d   ROPE %02d\nSTONE  %02d   HERB   %02d   MAP  %02d\nCOINS  %02d   RUBY   %02d   GOLD %02d\nEMRLD  %02d   SAPPH  %02d   PEARL %02d\nSHARD  %02d",
         amount(inventory, "Wood"),
         amount(inventory, "Cloth"),
         amount(inventory, "Rope"),
         amount(inventory, "Stone"),
         amount(inventory, "Herb"),
+        amount(inventory, "MapFragment"),
         amount(inventory, "AncientCoin"),
         amount(inventory, "Ruby"),
         amount(inventory, "GoldBar"),
+        amount(inventory, "Emerald"),
+        amount(inventory, "Sapphire"),
+        amount(inventory, "Pearl"),
         amount(inventory, "RelicShard")
     )
-    statsLabel.Text = string.format("TREASURE  %d    •    CAVES  %d", packet.TreasureValue or 0, packet.CavesCleared or 0)
+    renderStats()
     if packet.SafeCamp then
         campLabel.Text = "SAFE CAMP: " .. tostring(packet.SafeCamp) .. "  •  respawn/checkpoint active"
     else
-        campLabel.Text = "Tent: Wood 6 • Cloth 3 • Rope 2 • Stone 4"
+        campLabel.Text = "CAMP: Wood 6 • Cloth 3 • Rope 2 • Stone 4  •  Cave camps need guardian cleared"
     end
 end
 
@@ -170,9 +188,12 @@ local function bindTool(tool)
     boundTools[tool] = true
     tool.Activated:Connect(function()
         local itemId = tool:GetAttribute("ItemId")
-        if itemId == "Machete" then
+        local definition = itemId and GameplayConfig.Items[itemId]
+        if definition and definition.Damage then
             actionRemote:FireServer("Attack", itemId)
-        elseif itemId == "Medkit" then
+        elseif definition and definition.Heal then
+            actionRemote:FireServer("Use", itemId)
+        elseif itemId == "AncientCompass" then
             actionRemote:FireServer("Use", itemId)
         end
     end)
@@ -194,6 +215,7 @@ if player.Character then
     bindContainer(player.Character)
 end
 
+player:GetAttributeChangedSignal("WorldEnemiesDefeated"):Connect(renderStats)
 stateRemote.OnClientEvent:Connect(renderState)
 toastRemote.OnClientEvent:Connect(showToast)
 
