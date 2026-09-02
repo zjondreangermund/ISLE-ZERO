@@ -1,5 +1,5 @@
 local WorldConfig = {
-    WorldVersion = 7,
+    WorldVersion = 8,
     Seed = 7102026,
 
     SeaLevel = 0,
@@ -9,7 +9,7 @@ local WorldConfig = {
     Island = {
         HalfX = 1180,
         HalfZ = 980,
-        Grid = 16,
+        Grid = 12,
         BaseY = -72,
         BeachBand = 0.34,
     },
