@@ -5,6 +5,30 @@
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared"
+      },
+      "ISLEZeroAssets": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": true,
+        "Structures": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        },
+        "Nature": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        },
+        "Creatures": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        },
+        "Props": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        },
+        "Tools": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        }
       }
     },
     "ServerScriptService": {
