@@ -11,12 +11,14 @@ local NaturalFeatureBuilder = require(script.Parent.NaturalFeatureBuilder)
 local PathBuilder = require(script.Parent.PathBuilder)
 local LandmarkBuilder = require(script.Parent.LandmarkBuilder)
 local RegionBuilder = require(script.Parent.RegionBuilder)
+local AdventureBuilder = require(script.Parent.AdventureBuilder)
 local ExplorationSiteBuilder = require(script.Parent.ExplorationSiteBuilder)
 local SignpostBuilder = require(script.Parent.SignpostBuilder)
 local VegetationBuilder = require(script.Parent.VegetationBuilder)
 local ExplorationClearing = require(script.Parent.ExplorationClearing)
 local ExplorationAudit = require(script.Parent.ExplorationAudit)
 local RegionAudit = require(script.Parent.RegionAudit)
+local AdventureAudit = require(script.Parent.AdventureAudit)
 local WorldAudit = require(script.Parent.WorldAudit)
 local WorldPreflight = require(script.Parent.WorldPreflight)
 local SpawnFlow = require(script.Parent.SpawnFlow)
@@ -139,6 +141,10 @@ function WorldBuilder.Build()
             RegionBuilder.Build(config, root, TerrainBuilder.HeightAt, gameplayConfig)
         end)
 
+        runPhase(root, "Adventure", function()
+            AdventureBuilder.Build(config, root, TerrainBuilder.HeightAt, gameplayConfig)
+        end)
+
         runPhase(root, "Vegetation", function()
             VegetationBuilder.Build(
                 config,
@@ -174,6 +180,13 @@ function WorldBuilder.Build()
             error(string.format("Region audit found %d blocking error(s)", #regionAudit.errors), 0)
         end
 
+        local adventureAudit = runPhase(root, "AdventureAudit", function()
+            return AdventureAudit.Run(root, gameplayConfig)
+        end)
+        if #adventureAudit.errors > 0 then
+            error(string.format("Adventure audit found %d blocking error(s)", #adventureAudit.errors), 0)
+        end
+
         local audit = runPhase(root, "Audit", function()
             return WorldAudit.Run(config, root, TerrainBuilder.HeightAt)
         end)
@@ -202,8 +215,8 @@ function WorldBuilder.Build()
         workspace:SetAttribute("ISLEZeroBuildState", "Ready")
         workspace:SetAttribute("ISLEZeroCurrentPhase", "Ready")
         workspace:SetAttribute("ISLEZeroGenerationSeconds", math.floor((os.clock() - started) * 100) / 100)
-        workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors + #explorationAudit.errors + #regionAudit.errors)
-        workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings + #explorationAudit.warnings + #regionAudit.warnings)
+        workspace:SetAttribute("ISLEZeroAuditErrors", #audit.errors + #explorationAudit.errors + #regionAudit.errors + #adventureAudit.errors)
+        workspace:SetAttribute("ISLEZeroAuditWarnings", #audit.warnings + #explorationAudit.warnings + #regionAudit.warnings + #adventureAudit.warnings)
 
         return root
     end)
