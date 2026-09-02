@@ -1,5 +1,3 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local MAX_TREEHOUSE_EXTENT = 78
 local MIN_TREEHOUSE_EXTENT = 10
 local TREEHOUSE_KEY = "AUTHORED_TreeHouse_"
@@ -67,7 +65,6 @@ local function realignToPlaceholder(instance)
         return
     end
 
-    -- Keep the authored model standing on the same floor as the generated shelter.
     local targetBottom = select(1, placeholder:GetBoundingBox()).Position.Y - targetSize.Y / 2
     local visualBottom = visualCf.Position.Y - visualSize.Y / 2
     local deltaY = targetBottom - visualBottom
