@@ -6,6 +6,22 @@ local GameplayConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForC
 
 local activeByMarker = setmetatable({}, {__mode = "k"})
 
+local EXTRA_GUARDIANS = {
+    JungleSnake = {
+        DisplayName = "Venom Jungle Snake",
+        Health = 38,
+        Damage = 7,
+        WalkSpeed = 15,
+        AggroRange = 34,
+        AttackRange = 4.2,
+        BodyColor = Color3.fromRGB(63, 91, 47),
+        AccentColor = Color3.fromRGB(118, 137, 65),
+        Scale = 0.72,
+        PoisonDamage = 2,
+        PoisonTicks = 3,
+    },
+}
+
 local function toast(player, message)
     local remotes = ReplicatedStorage:FindFirstChild("ISLEZeroSurvival")
     local remote = remotes and remotes:FindFirstChild("Toast")
@@ -40,6 +56,10 @@ local function escapePoint(zone, radius, position, fallback)
     end
     delta = delta.Unit * ((radius or 29) + 8)
     return Vector3.new(zone.Position.X + delta.X, position.Y, zone.Position.Z + delta.Z)
+end
+
+local function definitionFor(guardianType)
+    return GameplayConfig.Guardians[guardianType] or EXTRA_GUARDIANS[guardianType]
 end
 
 local function animalPart(model, name, size, cframe, color)
@@ -147,39 +167,29 @@ local function createRawMeatDrop(position, guardianType)
     end)
 end
 
-local function spawnEnemy(marker)
-    if not marker.Parent or activeByMarker[marker] then
-        return
-    end
+local function createSnakePlaceholder(model, root, definition, scale)
+    local body = animalPart(
+        model,
+        "Body",
+        Vector3.new(1.2 * scale, 1.2 * scale, 7.2 * scale),
+        root.CFrame * CFrame.new(0, 0.35 * scale, 0),
+        definition.BodyColor
+    )
+    body.Shape = Enum.PartType.Cylinder
+    body.CFrame = body.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+    weld(root, body)
 
-    local guardianType = marker:GetAttribute("GuardianType") or "WildBoar"
-    local definition = GameplayConfig.Guardians[guardianType]
-    if not definition then
-        warn("[ISLE//ZERO][WILDLIFE] Missing Guardian definition: " .. guardianType)
-        return
-    end
+    local head = animalPart(
+        model,
+        "Head",
+        Vector3.new(1.7 * scale, 1.3 * scale, 2.1 * scale),
+        root.CFrame * CFrame.new(0, 0.55 * scale, -4.0 * scale),
+        definition.AccentColor
+    )
+    weld(root, head)
+end
 
-    local scale = definition.Scale or 0.85
-    local model = Instance.new("Model")
-    model.Name = "Wild_" .. guardianType
-    model:SetAttribute("EncounterId", marker:GetAttribute("EncounterId"))
-    model:SetAttribute("GuardianType", guardianType)
-    model:SetAttribute("WorldEnemy", true)
-    model.Parent = marker.Parent
-    CollectionService:AddTag(model, "CaveGuardian")
-    CollectionService:AddTag(model, "WorldEnemy")
-
-    local spawnPosition = marker.Position + Vector3.new(0, 2.5, 0)
-    local root = Instance.new("Part")
-    root.Name = "HumanoidRootPart"
-    root.Size = Vector3.new(3 * scale, 2.2 * scale, 5 * scale)
-    root.CFrame = CFrame.new(spawnPosition)
-    root.Transparency = 1
-    root.Anchored = false
-    root.CanCollide = true
-    root.CanTouch = false
-    root.Parent = model
-
+local function createQuadrupedPlaceholder(model, root, definition, scale)
     local body = animalPart(model, "Body", Vector3.new(4.3 * scale, 2.8 * scale, 6.4 * scale), root.CFrame * CFrame.new(0, 1 * scale, 0), definition.BodyColor)
     weld(root, body)
     local head = animalPart(model, "Head", Vector3.new(2.8 * scale, 2.5 * scale, 2.9 * scale), root.CFrame * CFrame.new(0, 1.35 * scale, -3.7 * scale), definition.AccentColor)
@@ -194,12 +204,71 @@ local function spawnEnemy(marker)
         local leg = animalPart(model, "Leg", Vector3.new(0.9 * scale, 3 * scale, 0.9 * scale), root.CFrame * CFrame.new(offset * scale), definition.BodyColor)
         weld(root, leg)
     end
+end
+
+local function applyPoison(player, humanoid, definition)
+    local ticks = definition.PoisonTicks or 0
+    local damage = definition.PoisonDamage or 0
+    if ticks <= 0 or damage <= 0 then
+        return
+    end
+
+    toast(player, "Venom is slowing you down. Reach a safe camp or use healing supplies.")
+    task.spawn(function()
+        for _ = 1, ticks do
+            task.wait(2)
+            if humanoid.Parent and humanoid.Health > 0 and not safeCampAt(humanoid.Parent:GetPivot().Position) then
+                humanoid:TakeDamage(damage)
+            end
+        end
+    end)
+end
+
+local function spawnEnemy(marker)
+    if not marker.Parent or activeByMarker[marker] then
+        return
+    end
+
+    local guardianType = marker:GetAttribute("GuardianType") or "WildBoar"
+    local definition = definitionFor(guardianType)
+    if not definition then
+        warn("[ISLE//ZERO][WILDLIFE] Missing Guardian definition: " .. guardianType)
+        return
+    end
+
+    local scale = definition.Scale or 0.85
+    local model = Instance.new("Model")
+    model.Name = "Wild_" .. guardianType
+    model:SetAttribute("EncounterId", marker:GetAttribute("EncounterId"))
+    model:SetAttribute("GuardianType", guardianType)
+    model:SetAttribute("WorldEnemy", true)
+    model:SetAttribute("AnimationState", "Idle")
+    model.Parent = marker.Parent
+    CollectionService:AddTag(model, "CaveGuardian")
+    CollectionService:AddTag(model, "WorldEnemy")
+
+    local spawnPosition = marker.Position + Vector3.new(0, guardianType == "JungleSnake" and 1.0 or 2.5, 0)
+    local root = Instance.new("Part")
+    root.Name = "HumanoidRootPart"
+    root.Size = guardianType == "JungleSnake" and Vector3.new(1.3, 1, 4.8) or Vector3.new(3 * scale, 2.2 * scale, 5 * scale)
+    root.CFrame = CFrame.new(spawnPosition)
+    root.Transparency = 1
+    root.Anchored = false
+    root.CanCollide = true
+    root.CanTouch = false
+    root.Parent = model
+
+    if guardianType == "JungleSnake" then
+        createSnakePlaceholder(model, root, definition, scale)
+    else
+        createQuadrupedPlaceholder(model, root, definition, scale)
+    end
 
     local humanoid = Instance.new("Humanoid")
     humanoid.MaxHealth = definition.Health
     humanoid.Health = definition.Health
     humanoid.WalkSpeed = definition.WalkSpeed
-    humanoid.HipHeight = 1.1 * scale
+    humanoid.HipHeight = guardianType == "JungleSnake" and 0.3 or 1.1 * scale
     humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     humanoid.Parent = model
     model.PrimaryPart = root
@@ -218,35 +287,53 @@ local function spawnEnemy(marker)
             task.wait(0.32)
             local zone, safeRadius = safeCampAt(root.Position)
             if zone then
+                model:SetAttribute("AnimationState", "Walk")
                 humanoid:MoveTo(escapePoint(zone, safeRadius, root.Position, home))
             else
                 local player, targetRoot, targetHumanoid, distance = nearestTarget(root.Position, definition.AggroRange or 50)
                 local homeDistance = (root.Position - home).Magnitude
 
                 if player and targetRoot and targetHumanoid and homeDistance < 115 then
+                    model:SetAttribute("AnimationState", "Run")
                     humanoid:MoveTo(targetRoot.Position)
                     if distance <= (definition.AttackRange or 5) and os.clock() - lastAttack >= 1.35 then
                         lastAttack = os.clock()
+                        model:SetAttribute("AnimationState", "Attack")
+                        model:SetAttribute("AnimationPulse", (model:GetAttribute("AnimationPulse") or 0) + 1)
                         targetHumanoid:TakeDamage(definition.Damage or 8)
+                        if guardianType == "JungleSnake" then
+                            applyPoison(player, targetHumanoid, definition)
+                        end
                         toast(player, definition.DisplayName .. " attacked you!")
                     end
                 elseif homeDistance > 8 then
+                    model:SetAttribute("AnimationState", "Walk")
                     humanoid:MoveTo(home)
+                else
+                    model:SetAttribute("AnimationState", "Idle")
                 end
             end
         end
     end)
 
     humanoid.Died:Connect(function()
+        model:SetAttribute("AnimationState", "Death")
+        model:SetAttribute("AnimationPulse", (model:GetAttribute("AnimationPulse") or 0) + 1)
         local deathPosition = root.Position
         local killerId = model:GetAttribute("LastHitUserId")
         local killer = killerId and Players:GetPlayerByUserId(killerId)
         if killer then
             killer:SetAttribute("WorldEnemiesDefeated", (killer:GetAttribute("WorldEnemiesDefeated") or 0) + 1)
-            toast(killer, string.format("%s defeated. It dropped meat you can cook at a camp.", definition.DisplayName))
+            if guardianType == "JungleSnake" then
+                toast(killer, "Venom snake defeated. The jungle path is safer for a while.")
+            else
+                toast(killer, string.format("%s defeated. It dropped meat you can cook at a camp.", definition.DisplayName))
+            end
         end
 
-        createRawMeatDrop(deathPosition, guardianType)
+        if guardianType ~= "JungleSnake" then
+            createRawMeatDrop(deathPosition, guardianType)
+        end
         activeByMarker[marker] = nil
         task.delay(4, function()
             if model.Parent then
@@ -269,8 +356,14 @@ local function bindWorld()
             count += 1
         end
     end
-    print(string.format("[ISLE//ZERO][WILDLIFE] %d roaming encounters activated; built camps are safe zones", count))
+    print(string.format("[ISLE//ZERO][WILDLIFE] %d roaming encounters activated; built camps and shelters are safe zones", count))
 end
+
+CollectionService:GetInstanceAddedSignal("WorldEnemySpawn"):Connect(function(marker)
+    if marker:IsA("BasePart") and marker:IsDescendantOf(workspace) then
+        task.delay(0.15, spawnEnemy, marker)
+    end
+end)
 
 workspace:GetAttributeChangedSignal("ISLEZeroGenerated"):Connect(function()
     if workspace:GetAttribute("ISLEZeroGenerated") == true then
