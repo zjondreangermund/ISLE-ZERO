@@ -28,6 +28,34 @@
         "Tools": {
           "$className": "Folder",
           "$ignoreUnknownInstances": true
+        },
+        "WorldItems": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true,
+          "Resources": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": true
+          },
+          "Food": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": true
+          },
+          "Treasure": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": true
+          },
+          "Equipment": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": true
+          }
+        },
+        "Furniture": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
+        },
+        "Effects": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true
         }
       }
     },
