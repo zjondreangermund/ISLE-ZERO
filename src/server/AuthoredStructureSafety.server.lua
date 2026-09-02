@@ -2,7 +2,7 @@ local AUTHORED_PREFIX = "AUTHORED_"
 local TREEHOUSE_KEY = "AUTHORED_TreeHouse_"
 
 local LIMITS = {
-    TreeHouse = 64,
+    TreeHouse = 52,
     SafeTent = 28,
     JungleTree = 86,
     EmergentTree = 105,
@@ -10,6 +10,13 @@ local LIMITS = {
     Mangrove = 62,
     WorldChest = 18,
     CaveChest = 18,
+}
+
+local PART_LIMITS = {
+    TreeHouse = 38,
+    SafeTent = 20,
+    WorldChest = 14,
+    CaveChest = 14,
 }
 
 local DEFAULT_LIMIT = 72
@@ -85,10 +92,10 @@ local function removeUnsupportedContent(instance)
     end
 end
 
-local function sanitizeOutlierParts(instance, limit)
+local function sanitizeOutlierParts(instance, key, limit)
     local center = visualPivot(instance)
     local removed = 0
-    local maxPartExtent = limit * PART_LIMIT_MULTIPLIER
+    local maxPartExtent = PART_LIMITS[key] or (limit * PART_LIMIT_MULTIPLIER)
     local maxDistance = limit * OUTLIER_DISTANCE_MULTIPLIER
 
     local descendants = instance:IsA("Model") and instance:GetDescendants() or {instance}
@@ -97,12 +104,18 @@ local function sanitizeOutlierParts(instance, limit)
             local size = descendant.Size
             local largest = math.max(size.X, size.Y, size.Z)
             local distance = (descendant.Position - center).Magnitude
+            local flatSlab = key == "TreeHouse"
+                and math.max(size.X, size.Z) > 30
+                and size.Y > 18
 
-            if largest > maxPartExtent or distance > maxDistance then
+            if largest > maxPartExtent or distance > maxDistance or flatSlab then
                 warn(string.format(
-                    "[ISLE//ZERO][ASSET SAFETY] Quarantined oversized/outlier part %s (extent %.1f, distance %.1f).",
+                    "[ISLE//ZERO][ASSET SAFETY] Quarantined invalid %s part %s (size %.1f x %.1f x %.1f, distance %.1f).",
+                    key,
                     descendant:GetFullName(),
-                    largest,
+                    size.X,
+                    size.Y,
+                    size.Z,
                     distance
                 ))
                 descendant:Destroy()
@@ -151,6 +164,21 @@ local function realignTreeHouse(instance)
     end
 end
 
+local function hideRemainingGeometry(instance)
+    if instance:IsA("BasePart") then
+        instance.Transparency = 1
+        instance.CanCollide = false
+        return
+    end
+
+    for _, descendant in ipairs(instance:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            descendant.Transparency = 1
+            descendant.CanCollide = false
+        end
+    end
+end
+
 local function validateAuthoredVisual(instance)
     if processed[instance] or not (instance:IsA("Model") or instance:IsA("BasePart")) then
         return
@@ -182,7 +210,7 @@ local function validateAuthoredVisual(instance)
         end
     end
 
-    local removed = sanitizeOutlierParts(instance, limit)
+    local removed = sanitizeOutlierParts(instance, key, limit)
     if key == "TreeHouse" or startsWith(instance.Name, TREEHOUSE_KEY) then
         realignTreeHouse(instance)
     end
@@ -190,22 +218,13 @@ local function validateAuthoredVisual(instance)
     local _, finalSize = boundsOf(instance)
     if finalSize then
         local finalLargest = math.max(finalSize.X, finalSize.Y, finalSize.Z)
-        if finalLargest > limit * 1.45 then
+        if finalLargest > limit * 1.25 then
             warn(string.format(
-                "[ISLE//ZERO][ASSET SAFETY] %s remains oversized after cleanup (%.1f studs). Hiding remaining authored geometry for this run.",
+                "[ISLE//ZERO][ASSET SAFETY] %s remains oversized after cleanup (%.1f studs). Hiding authored geometry for this run.",
                 instance.Name,
                 finalLargest
             ))
-            for _, descendant in ipairs(instance:GetDescendants()) do
-                if descendant:IsA("BasePart") then
-                    descendant.Transparency = 1
-                    descendant.CanCollide = false
-                end
-            end
-            if instance:IsA("BasePart") then
-                instance.Transparency = 1
-                instance.CanCollide = false
-            end
+            hideRemainingGeometry(instance)
         elseif removed > 0 then
             print(string.format("[ISLE//ZERO][ASSET SAFETY] %s cleaned; %d invalid parts removed", instance.Name, removed))
         end
