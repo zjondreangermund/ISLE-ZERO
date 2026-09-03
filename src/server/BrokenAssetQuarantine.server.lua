@@ -24,23 +24,62 @@ local function brokenAssetId(instance)
     return nil
 end
 
+-- Return the individual authored asset that owns this mesh, never the category
+-- folder itself (Creatures / Nature / Props / Structures).
 local function sourceAssetFor(instance)
     local current = instance
-    while current.Parent and current.Parent ~= assets do
-        current = current.Parent
+
+    if current.Parent == assets then
+        return current
     end
-    return current
+
+    while current.Parent and current.Parent ~= assets do
+        local parent = current.Parent
+        if parent.Parent == assets then
+            -- parent is a category folder, so current is the actual authored asset.
+            return current
+        end
+        current = parent
+    end
+
+    return current ~= assets and current or nil
 end
 
-local quarantined = {}
+local removals = {}
 for _, descendant in ipairs(assets:GetDescendants()) do
     local assetId = brokenAssetId(descendant)
     if assetId then
-        local source = sourceAssetFor(descendant)
-        if source and not quarantined[source] then
-            quarantined[source] = true
-            warn(string.format("[ISLE//ZERO][ASSET QUARANTINE] Removed %s because Roblox cannot fetch mesh %s", source.Name, assetId))
-            source:Destroy()
-        end
+        table.insert(removals, {
+            Instance = descendant,
+            AssetId = assetId,
+            Source = sourceAssetFor(descendant),
+        })
+    end
+end
+
+local counts = {}
+for _, entry in ipairs(removals) do
+    local descendant = entry.Instance
+    local source = entry.Source
+
+    if source then
+        counts[source] = (counts[source] or 0) + 1
+    end
+
+    if descendant.Parent then
+        -- Remove only the broken mesh object. Never destroy the entire source model
+        -- and never destroy a category folder because one asset contains a bad mesh.
+        descendant:Destroy()
+    end
+end
+
+for source, count in pairs(counts) do
+    if source.Parent then
+        source:SetAttribute("ISLEZeroQuarantinedMeshCount", count)
+        warn(string.format(
+            "[ISLE//ZERO][ASSET QUARANTINE] Removed %d broken mesh object(s) from %s; source asset preserved",
+            count,
+            source.Name
+        ))
     end
 end
